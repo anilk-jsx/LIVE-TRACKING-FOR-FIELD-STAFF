@@ -1,0 +1,141 @@
+{
+  "status": true,
+  "message": "Data feched sucessfuly",
+  "date": "12-09-2025 10:0AM",
+  "exectime": "20.3ms",
+  "data": [
+    {
+      "id": 1,
+      "latitude": 20.296059,
+      "longitude": 20.296059,
+      "addressDetail": "Plot 123, Saheed Nagar, Bhubaneswar, Odisha",
+      "dateTime": "2025-09-18T10:30:00",
+      "landmark": "Near Maharaja Cinema Hall",
+      "photos": [
+        "photo_123_1.jpg",
+        "photo_123_2.jpg"
+      ],
+      "updatedBy": "AdminUser1"
+    },
+    {
+      "id": 2,
+      "latitude": 20.301212,
+      "longitude": 85.819011,
+      "addressDetail": "Flat 45, Nayapalli, Bhubaneswar, Odisha",
+      "dateTime": "2025-09-18T11:10:00",
+      "landmark": "Opposite CRP Square",
+      "photos": [
+        "photo_124_1.jpg",
+        "photo_124_2.jpg",
+        "photo_124_3.jpg"
+      ],
+      "updatedBy": "SurveyUser2"
+    },
+    {
+      "id": 3,
+      "latitude": 20.280671,
+      "longitude": 85.833832,
+      "addressDetail": "Unit 9, Near DAV School, Bhubaneswar",
+      "dateTime": "2025-09-18T12:00:00",
+      "landmark": "Beside DAV School Gate",
+      "photos": [
+        "photo_125_1.jpg",
+        "photo_125_2.jpg"
+      ],
+      "updatedBy": "AdminUser3"
+    },
+    {
+      "id": 4,
+      "latitude": 20.287450,
+      "longitude": 85.825930,
+      "addressDetail": "Bapuji Nagar Main Road, Bhubaneswar",
+      "dateTime": "2025-09-18T12:40:00",
+      "landmark": "Near Reliance Fresh",
+      "photos": [
+        "photo_126_1.jpg",
+        "photo_126_2.jpg"
+      ],
+      "updatedBy": "SurveyUser4"
+    },
+    {
+      "id": 5,
+      "latitude": 20.313728,
+      "longitude": 85.819845,
+      "addressDetail": "House No 56, Jayadev Vihar, Bhubaneswar",
+      "dateTime": "2025-09-18T13:15:00",
+      "landmark": "Beside Fortune Hotel",
+      "photos": [
+        "photo_127_1.jpg",
+        "photo_127_2.jpg",
+        "photo_127_3.jpg"
+      ],
+      "updatedBy": "AdminUser5"
+    },
+    {
+      "id": 6,
+      "latitude": 20.270010,
+      "longitude": 85.831210,
+      "addressDetail": "Plot 12, Khandagiri, Bhubaneswar",
+      "dateTime": "2025-09-18T14:00:00",
+      "landmark": "Near Khandagiri Temple",
+      "photos": [
+        "photo_128_1.jpg",
+        "photo_128_2.jpg"
+      ],
+      "updatedBy": "SurveyUser6"
+    },
+    {
+      "id": 7,
+      "latitude": 20.297340,
+      "longitude": 85.844600,
+      "addressDetail": "Plot 89, Rasulgarh, Bhubaneswar",
+      "dateTime": "2025-09-18T14:45:00",
+      "landmark": "Near Big Bazaar",
+      "photos": [
+        "photo_129_1.jpg",
+        "photo_129_2.jpg"
+      ],
+      "updatedBy": "AdminUser7"
+    },
+    {
+      "id": 8,
+      "latitude": 20.311980,
+      "longitude": 85.826700,
+      "addressDetail": "Chandrasekharpur, Bhubaneswar",
+      "dateTime": "2025-09-18T15:20:00",
+      "landmark": "Near KIIT Campus",
+      "photos": [
+        "photo_130_1.jpg",
+        "photo_130_2.jpg",
+        "photo_130_3.jpg"
+      ],
+      "updatedBy": "SurveyUser8"
+    },
+    {
+      "id": 9,
+      "latitude": 20.295000,
+      "longitude": 85.806500,
+      "addressDetail": "Patia Square, Bhubaneswar",
+      "dateTime": "2025-09-18T16:00:00",
+      "landmark": "Beside Reliance Trends",
+      "photos": [
+        "photo_131_1.jpg",
+        "photo_131_2.jpg"
+      ],
+      "updatedBy": "AdminUser9"
+    },
+    {
+      "id": 10,
+      "latitude": 20.312300,
+      "longitude": 85.835400,
+      "addressDetail": "Acharya Vihar, Bhubaneswar",
+      "dateTime": "2025-09-18T16:40:00",
+      "landmark": "Opposite Rama Devi University",
+      "photos": [
+        "photo_132_1.jpg",
+        "photo_132_2.jpg"
+      ],
+      "updatedBy": "SurveyUser10"
+    }
+  ]
+}
