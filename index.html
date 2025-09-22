@@ -16,15 +16,17 @@
             font-family: Arial, sans-serif;
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             color: white;
-            overflow-x: hidden; /* Remove horizontal scrollbar */
-            overflow-y: hidden; /* Remove vertical scrollbar */
-            height: 100vh; /* Full viewport height */
+            overflow: hidden; /* Remove all scrollbars */
+            height: 100vh; /* Exact viewport height */
+            display: flex;
+            flex-direction: column;
         }
         
         .header {
             text-align: center;
-            padding: 20px;
+            padding: 15px 20px;
             background: rgba(0, 0, 0, 0.2);
+            flex-shrink: 0;
         }
         
         .header h1 {
@@ -43,9 +45,10 @@
         
         .main-container {
             display: flex;
-            height: calc(100vh - 120px);
+            flex: 1;
             gap: 20px;
-            padding: 20px;
+            padding: 15px 20px;
+            overflow: hidden;
         }
         
         .sidebar {
@@ -54,9 +57,10 @@
             border-radius: 15px;
             padding: 20px;
             color: #333;
-            overflow-y: auto; /* Keep vertical scrollbar for sidebar content */
+            overflow-y: hidden; /* Hide vertical scrollbar */
             overflow-x: hidden; /* Remove horizontal scrollbar */
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            flex-shrink: 0;
         }
         
         .staff-info {
@@ -102,7 +106,7 @@
         
         .timeline {
             max-height: 400px;
-            overflow-y: auto; /* Keep vertical scrollbar for timeline content */
+            overflow-y: auto; /* Restore vertical scrollbar for timeline content when needed */
             overflow-x: hidden; /* Remove horizontal scrollbar */
         }
         
@@ -151,6 +155,7 @@
             border-radius: 15px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             position: relative;
+            overflow: hidden;
         }
         
         .recenter-button {
@@ -186,6 +191,43 @@
         .recenter-button::before {
             content: '🎯';
             font-size: 20px;
+        }
+        
+        .add-place-button {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            z-index: 1000;
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .add-place-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+            background: linear-gradient(45deg, #27ae60, #229954);
+        }
+        
+        .add-place-button:active {
+            transform: scale(0.95);
+        }
+        
+        .add-place-button::before {
+            content: '+';
+            font-size: 28px;
+            line-height: 1;
         }
         
         .summary-stats {
@@ -240,7 +282,7 @@
         /* Mobile Styles (max-width: 768px) */
         @media screen and (max-width: 768px) {
             .header {
-                padding: 15px 10px;
+                padding: 12px 10px;
             }
             
             .header h1 {
@@ -253,23 +295,26 @@
             
             .main-container {
                 flex-direction: column;
-                height: auto;
-                min-height: calc(100vh - 100px);
-                gap: 15px;
+                gap: 12px;
                 padding: 10px;
             }
             
             .sidebar {
                 width: 100%;
                 order: 2;
-                max-height: 400px;
+                max-height: 40vh;
                 padding: 15px;
+                flex-shrink: 0;
+                min-height: 200px;
+                margin: 0 auto;
+                box-sizing: border-box;
             }
             
             #map {
                 order: 1;
-                height: 50vh;
-                min-height: 300px;
+                flex: 1;
+                min-height: 50vh;
+                max-height: 55vh;
             }
             
             .summary-stats {
@@ -327,10 +372,36 @@
             .timeline-content p {
                 font-size: 0.75rem;
             }
+            
+            .recenter-button {
+                width: 45px;
+                height: 45px;
+                top: 10px;
+                right: 10px;
+            }
+            
+            .recenter-button::before {
+                font-size: 16px;
+            }
+            
+            .add-place-button {
+                width: 50px;
+                height: 50px;
+                bottom: 10px;
+                right: 10px;
+            }
+            
+            .add-place-button::before {
+                font-size: 22px;
+            }
         }
         
         /* Small Mobile Styles (max-width: 480px) */
         @media screen and (max-width: 480px) {
+            .header {
+                padding: 10px 8px;
+            }
+            
             .header h1 {
                 font-size: 1.8rem;
             }
@@ -341,18 +412,22 @@
             
             .main-container {
                 padding: 8px;
-                gap: 10px;
+                gap: 8px;
             }
             
             .sidebar {
                 padding: 12px;
                 border-radius: 10px;
+                max-height: 35vh;
+                min-height: 180px;
+                margin: 0 auto;
+                box-sizing: border-box;
             }
             
             #map {
-                height: 45vh;
-                min-height: 250px;
                 border-radius: 10px;
+                min-height: 55vh;
+                max-height: 60vh;
             }
             
             .summary-stats {
@@ -402,59 +477,32 @@
             }
             
             .recenter-button {
-                width: 45px;
-                height: 45px;
-                top: 12px;
-                right: 12px;
+                width: 40px;
+                height: 40px;
+                top: 8px;
+                right: 8px;
             }
             
             .recenter-button::before {
-                font-size: 18px;
+                font-size: 14px;
+            }
+            
+            .add-place-button {
+                width: 45px;
+                height: 45px;
+                bottom: 8px;
+                right: 8px;
+            }
+            
+            .add-place-button::before {
+                font-size: 20px;
             }
         }
         
         /* Extra Small Mobile Styles (max-width: 320px) */
         @media screen and (max-width: 320px) {
-            .header h1 {
-                font-size: 1.5rem;
-            }
-            
-            .summary-stats {
-                grid-template-columns: 1fr;
-                gap: 8px;
-            }
-            
-            .stat-card {
-                padding: 12px;
-            }
-            
-            #map {
-                height: 40vh;
-                min-height: 200px;
-            }
-        }
-        
-        /* Landscape Mobile Orientation */
-        @media screen and (max-height: 500px) and (orientation: landscape) {
-            .main-container {
-                flex-direction: row;
-                height: calc(100vh - 80px);
-            }
-            
-            .sidebar {
-                width: 320px;
-                order: 1;
-                max-height: none;
-            }
-            
-            #map {
-                order: 2;
-                height: auto;
-                min-height: auto;
-            }
-            
             .header {
-                padding: 10px;
+                padding: 8px;
             }
             
             .header h1 {
@@ -463,6 +511,99 @@
             
             .header p {
                 font-size: 0.8rem;
+            }
+            
+            .main-container {
+                padding: 6px;
+                gap: 6px;
+            }
+            
+            .sidebar {
+                max-height: 30vh;
+                min-height: 150px;
+                padding: 10px;
+                margin: 0 auto;
+                box-sizing: border-box;
+            }
+            
+            #map {
+                min-height: 60vh;
+                max-height: 65vh;
+            }
+            
+            .summary-stats {
+                grid-template-columns: 1fr;
+                gap: 6px;
+            }
+            
+            .stat-card {
+                padding: 10px;
+            }
+            
+            .recenter-button {
+                width: 35px;
+                height: 35px;
+                top: 6px;
+                right: 6px;
+            }
+            
+            .recenter-button::before {
+                font-size: 12px;
+            }
+            
+            .add-place-button {
+                width: 40px;
+                height: 40px;
+                bottom: 6px;
+                right: 6px;
+            }
+            
+            .add-place-button::before {
+                font-size: 18px;
+            }
+        }
+        
+        /* Landscape Mobile Orientation */
+        @media screen and (max-height: 500px) and (orientation: landscape) {
+            .header {
+                padding: 6px 10px;
+            }
+            
+            .header h1 {
+                font-size: 1.4rem;
+            }
+            
+            .header p {
+                font-size: 0.75rem;
+            }
+            
+            .main-container {
+                flex-direction: row;
+                padding: 8px;
+                gap: 10px;
+            }
+            
+            .sidebar {
+                width: 280px;
+                order: 1;
+                max-height: none;
+                min-height: 0;
+                flex: 0 0 280px;
+            }
+            
+            #map {
+                order: 2;
+                flex: 1;
+                min-height: 0;
+                max-height: none;
+            }
+        }
+        
+        /* Tablet Landscape Specific */
+        @media screen and (min-width: 768px) and (max-height: 600px) and (orientation: landscape) {
+            .sidebar {
+                width: 300px;
+                flex: 0 0 300px;
             }
         }
         
@@ -519,6 +660,7 @@
         
         <div id="map">
             <button class="recenter-button" id="recenterBtn" title="Recenter Map"></button>
+            <button class="add-place-button" id="addPlaceBtn" title="Add New Place"></button>
         </div>
     </div>
     
@@ -961,6 +1103,20 @@
                         }, 150);
                         
                         console.log('Map recentered to show all locations');
+                    });
+                    
+                    // Set up add place button functionality
+                    const addPlaceBtn = document.getElementById('addPlaceBtn');
+                    addPlaceBtn.addEventListener('click', function() {
+                        // Visual feedback
+                        addPlaceBtn.style.transform = 'scale(0.9)';
+                        setTimeout(() => {
+                            addPlaceBtn.style.transform = 'scale(1)';
+                            // Redirect to addPlace.html
+                            window.location.href = './addPlace.html';
+                        }, 150);
+                        
+                        console.log('Redirecting to Add Place page');
                     });
                     
                     // Fit the map to show all markers (only if any exist)
