@@ -16,9 +16,8 @@
             font-family: Arial, sans-serif;
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             color: white;
-            overflow-x: hidden; /* Remove horizontal scrollbar */
-            overflow-y: auto; /* Add vertical scrollbar */
-            min-height: 100vh; /* Minimum viewport height */
+            overflow: hidden; /* No scrollbars on desktop */
+            height: 100vh; /* Fixed viewport height for desktop */
             display: flex;
             flex-direction: column;
         }
@@ -291,6 +290,12 @@
         
         /* Mobile Styles (max-width: 768px) */
         @media screen and (max-width: 768px) {
+            body {
+                overflow-y: auto; /* Enable vertical scrollbar on mobile */
+                min-height: 100vh; /* Allow content to expand */
+                height: auto; /* Remove fixed height constraint */
+            }
+            
             .header {
                 padding: 12px 10px;
             }
