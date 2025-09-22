@@ -55,11 +55,15 @@
             width: 350px;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 15px;
-            padding: 20px;
+            padding: 20px 20px 30px 20px; /* Added bottom padding */
             color: #333;
             overflow: hidden; /* Hide scrollbars */
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            flex: 1; /* Same as map - takes available space for perfect centering */
+            max-width: 350px; /* Maintain sidebar width while allowing flex behavior */
         }
         
         .staff-info {
@@ -92,7 +96,7 @@
             margin: 2px 0;
             color: #7f8c8d;
             font-size: 0.9rem;
-        }
+        }z
         
         .status-online {
             display: inline-block;
@@ -104,10 +108,11 @@
         }
         
         .timeline {
-            max-height: 400px;
-            overflow-y: auto; /* Internal scrolling for timeline content only */
+            flex: 1;
+            overflow-y: auto; /* Scrollbar only when content overflows */
             overflow-x: hidden;
             padding-right: 5px; /* Space for scrollbar */
+            min-height: 0; /* Allow flex item to shrink below content size */
         }
         
         .timeline-item {
@@ -315,16 +320,20 @@
                 max-height: none;
                 padding: 15px;
                 flex-shrink: 0;
-                min-height: 60vh;
+                min-height: 80vh; /* Increased height to show at least 2 timeline items properly */
                 margin: 0 auto;
                 box-sizing: border-box;
+                flex: none; /* Override desktop flex:1 behavior for mobile */
+                max-width: none; /* Remove desktop width constraint */
+                display: flex;
+                flex-direction: column;
             }
             
             #map {
                 order: 1;
                 flex: 1;
-                min-height: 65vh;
-                max-height: 70vh;
+                min-height: 50vh; /* Reduced to accommodate larger sidebar */
+                max-height: 55vh; /* Reduced to accommodate larger sidebar */
             }
             
             .summary-stats {
