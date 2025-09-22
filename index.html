@@ -320,7 +320,7 @@
                 max-height: none;
                 padding: 15px;
                 flex-shrink: 0;
-                min-height: 80vh; /* Increased height to show at least 2 timeline items properly */
+                min-height: 60vh; /* Reduced to eliminate extra bottom space */
                 margin: 0 auto;
                 box-sizing: border-box;
                 flex: none; /* Override desktop flex:1 behavior for mobile */
@@ -332,8 +332,8 @@
             #map {
                 order: 1;
                 flex: 1;
-                min-height: 50vh; /* Reduced to accommodate larger sidebar */
-                max-height: 55vh; /* Reduced to accommodate larger sidebar */
+                min-height: 55vh; /* Increased due to reduced sidebar height */
+                max-height: 60vh; /* Increased due to reduced sidebar height */
             }
             
             .summary-stats {
@@ -437,16 +437,16 @@
             .sidebar {
                 padding: 12px;
                 border-radius: 10px;
-                max-height: 35vh;
-                min-height: 180px;
+                max-height: none; /* Remove height constraint */
+                min-height: 55vh; /* Reduced to eliminate extra bottom space */
                 margin: 0 auto;
                 box-sizing: border-box;
             }
             
             #map {
                 border-radius: 10px;
-                min-height: 70vh;
-                max-height: 75vh;
+                min-height: 60vh; /* Increased due to reduced sidebar height */
+                max-height: 65vh; /* Increased due to reduced sidebar height */
             }
             
             .summary-stats {
