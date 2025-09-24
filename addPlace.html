@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add New Place - Field Staff Tracking</title>
+    <title>copy-Add New Place - Field Staff Tracking</title>
 
     <!-- Firebase SDKs -->
     <script type="module">
@@ -1065,7 +1065,7 @@
             }
         });
 
-        // Use current location functionality
+        // Update the use location button event listener
         useLocationBtn.addEventListener('click', function () {
             if (!navigator.geolocation) {
                 showLocationStatus('Geolocation is not supported by this browser.', 'error');
@@ -1085,12 +1085,16 @@
                     latitudeInput.value = lat.toFixed(6);
                     longitudeInput.value = lng.toFixed(6);
 
-                    // Get address using reverse geocoding
+                    // Get address using reverse geocoding with fallbacks
                     try {
-                        await reverseGeocode(lat, lng);
-                        showLocationStatus('✅ Location fetched successfully!', 'success');
+                        await reverseGeocodeWithFallbacks(lat, lng);
+                        showLocationStatus('✅ Location and address fetched successfully!', 'success');
                     } catch (error) {
-                        showLocationStatus('⚠️ Location found, but could not get address. Please enter manually.', 'error');
+                        showLocationStatus('✅ Location found! Please enter the address manually.', 'success');
+                        // Focus on address field for manual entry
+                        setTimeout(() => {
+                            addressInput.focus();
+                        }, 1000);
                     }
 
                     useLocationBtn.disabled = false;
@@ -1127,10 +1131,10 @@
         // Reverse geocoding to get address
         async function reverseGeocode(lat, lng) {
             try {
-                // Using OpenStreetMap Nominatim API (free)
-                const response = await fetch(
-                    `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`
-                );
+                // Option 1: Use a CORS proxy service
+                const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                const apiUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+                const response = await fetch(proxyUrl + encodeURIComponent(apiUrl));
 
                 if (response.ok) {
                     const data = await response.json();
@@ -1145,11 +1149,92 @@
                             landmarkInput.value = landmark;
                         }
                     }
+                } else {
+                    // Fallback to manual address entry
+                    throw new Error('Geocoding service unavailable');
                 }
             } catch (error) {
                 console.error('Reverse geocoding failed:', error);
+                // Fallback: Set a generic address format
+                const genericAddress = `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                addressInput.value = genericAddress;
+                addressInput.placeholder = "Please enter the complete address manually";
                 throw error;
             }
+        }
+
+        // Alternative reverse geocoding function with multiple fallbacks
+        async function reverseGeocodeWithFallbacks(lat, lng) {
+            const fallbackMethods = [
+                // Method 1: AllOrigins CORS proxy
+                async () => {
+                    const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                    const apiUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+                    const response = await fetch(proxyUrl + encodeURIComponent(apiUrl));
+                    return response.json();
+                },
+
+                // Method 2: CORS-Anywhere proxy (if available)
+                async () => {
+                    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+                    const apiUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+                    const response = await fetch(proxyUrl + apiUrl);
+                    return response.json();
+                },
+
+                // Method 3: BigDataCloud API (free alternative)
+                async () => {
+                    const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
+                    const data = await response.json();
+                    return {
+                        display_name: data.locality ?
+                            `${data.locality}, ${data.principalSubdivision}, ${data.countryName}` :
+                            `${data.principalSubdivision}, ${data.countryName}`,
+                        address: {
+                            city: data.city,
+                            locality: data.locality,
+                            principalSubdivision: data.principalSubdivision,
+                            countryName: data.countryName
+                        }
+                    };
+                }
+            ];
+
+            for (let i = 0; i < fallbackMethods.length; i++) {
+                try {
+                    console.log(`Trying geocoding method ${i + 1}...`);
+                    const data = await fallbackMethods[i]();
+
+                    if (data && (data.display_name || data.locality)) {
+                        const displayName = data.display_name ||
+                            `${data.locality || ''}, ${data.principalSubdivision || ''}, ${data.countryName || ''}`.replace(/^,\s*|,\s*$/g, '');
+
+                        addressInput.value = displayName;
+
+                        // Extract landmark if available
+                        if (data.address) {
+                            const address = data.address;
+                            const landmark = address.shop || address.amenity || address.tourism ||
+                                address.leisure || address.building || address.city || address.locality || '';
+                            if (landmark) {
+                                landmarkInput.value = landmark;
+                            }
+                        }
+
+                        console.log(`Geocoding successful with method ${i + 1}`);
+                        return;
+                    }
+                } catch (error) {
+                    console.warn(`Geocoding method ${i + 1} failed:`, error);
+                    continue;
+                }
+            }
+
+            // If all methods fail, provide coordinates as address
+            const genericAddress = `Location: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            addressInput.value = genericAddress;
+            addressInput.placeholder = "Please enter the complete address manually";
+            throw new Error('All geocoding methods failed');
         }
 
         // Show location status
@@ -1268,7 +1353,7 @@
         // Photo URL Conversion Functions
         async function convertPhotosToUrls(photos) {
             const photoUrls = [];
-            
+
             for (let i = 0; i < photos.length; i++) {
                 const photo = photos[i];
                 try {
@@ -1294,17 +1379,17 @@
                     });
                 }
             }
-            
+
             return photoUrls;
         }
 
         function convertFileToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = function (e) {
                     resolve(e.target.result);
                 };
-                reader.onerror = function(error) {
+                reader.onerror = function (error) {
                     reject(error);
                 };
                 reader.readAsDataURL(file);

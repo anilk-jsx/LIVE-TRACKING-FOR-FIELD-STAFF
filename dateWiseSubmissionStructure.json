@@ -1,0 +1,42 @@
+{
+  "documentId": "user123_20240924",
+  "userId": "user123",
+  "submissionDate": "2024-09-24",
+  "documentCreated": serverTimestamp(),
+  "lastUpdated": serverTimestamp(),
+  "stats": {
+    "totalPlaces": 5,
+    "totalPhotos": 12,
+    "firstSubmissionTime": "2024-09-24T08:30:00.000Z",
+    "lastSubmissionTime": "2024-09-24T17:45:00.000Z"
+  },
+  "places": [
+    {
+      "placeId": "user123_place_1727175052123",
+      "submissionOrder": 1,
+      "location": {
+        "latitude": 27.7172,
+        "longitude": 85.3240,
+        "addressDetail": "Kathmandu, Nepal",
+        "landmark": "Near Durbar Marg",
+        "wardNumber": "15"
+      },
+      "submissionTime": {
+        "timestamp": serverTimestamp(),
+        "iso": "2024-09-24T14:30:52.123Z",
+        "formatted": "September 24, 2024 at 2:30:52 PM UTC+5:45"
+      },
+      "photos": [
+        {
+          "photoId": "photo_1_1727175052123",
+          "name": "camera-photo-1727175052123.jpg",
+          "type": "image/jpeg",
+          "size": 245760,
+          "url": "data:image/jpeg;base64,/9j/4AAQSkZJRg...",
+          "uploadedAt": "2024-09-24T14:30:52.123Z"
+        }
+      ],
+      "photoCount": 1
+    }
+  ]
+}
