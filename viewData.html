@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Firebase Data - Trace The Path</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #1976D2;
+            transform: translateY(-2px);
+        }
+
+        .data-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            min-height: 400px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .place-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4CAF50;
+            transition: transform 0.3s ease;
+        }
+
+        .place-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .place-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .place-id {
+            font-size: 0.9rem;
+            color: #666;
+            font-family: monospace;
+            background: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .place-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .detail-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            color: #212529;
+            word-break: break-word;
+        }
+
+        .photos-section {
+            margin-top: 20px;
+        }
+
+        .photos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .photo-item {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .photo-item:hover {
+            transform: scale(1.05);
+        }
+
+        .photo-img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            cursor: pointer;
+        }
+
+        .photo-info {
+            padding: 8px;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        /* Modal for full-size photo view */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+        }
+
+        .modal-content {
+            margin: auto;
+            display: block;
+            width: 80%;
+            max-width: 700px;
+            max-height: 80%;
+            object-fit: contain;
+        }
+
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #bbb;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .place-details {
+                grid-template-columns: 1fr;
+            }
+            
+            .photos-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ Firebase Data Viewer</h1>
+            <p>View all stored places and photos from Trace The Path</p>
+        </div>
+
+        <div class="controls">
+            <div>
+                <button class="btn btn-primary" onclick="loadData()">🔄 Refresh Data</button>
+                <button class="btn btn-secondary" onclick="exportData()">📊 Export JSON</button>
+            </div>
+            <div id="stats" style="color: #666; font-size: 0.9rem;"></div>
+        </div>
+
+        <div class="data-container" id="dataContainer">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading Firebase data...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Modal -->
+    <div id="photoModal" class="modal">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <img class="modal-content" id="modalImg">
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, getDocs, orderBy, query } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyANjc0D7rCckQCCgEoMGbWEYlD_FkdkXzA",
+            authDomain: "trace-the-path.firebaseapp.com",
+            projectId: "trace-the-path",
+            storageBucket: "trace-the-path.firebasestorage.app",
+            messagingSenderId: "950208901508",
+            appId: "1:950208901508:web:dc67b4e58b94fccf0a4aef"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Make functions globally available
+        window.loadData = loadData;
+        window.exportData = exportData;
+        window.showPhoto = showPhoto;
+        window.closeModal = closeModal;
+
+        let allData = [];
+
+        async function loadData() {
+            const container = document.getElementById('dataContainer');
+            const stats = document.getElementById('stats');
+            
+            container.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading data from Firebase...</p>
+                </div>
+            `;
+
+            try {
+                // Query places collection ordered by creation date
+                const q = query(collection(db, 'places'), orderBy('createdAt', 'desc'));
+                const querySnapshot = await getDocs(q);
+                
+                allData = [];
+                querySnapshot.forEach((doc) => {
+                    allData.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+
+                displayData(allData);
+                updateStats(allData);
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                container.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Error Loading Data</h3>
+                        <p>Failed to load data from Firebase: ${error.message}</p>
+                        <p>Please check your Firebase configuration and try again.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function displayData(data) {
+            const container = document.getElementById('dataContainer');
+            
+            if (data.length === 0) {
+                container.innerHTML = `
+                    <div class="no-data">
+                        <h3>📭 No Data Found</h3>
+                        <p>No places have been added yet. Use the Add Place form to start collecting data.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            data.forEach((place, index) => {
+                html += createPlaceCard(place, index);
+            });
+
+            container.innerHTML = html;
+        }
+
+        function createPlaceCard(place, index) {
+            const formatDate = (timestamp) => {
+                if (!timestamp) return 'N/A';
+                try {
+                    if (timestamp.toDate) {
+                        return timestamp.toDate().toLocaleString();
+                    }
+                    return new Date(timestamp).toLocaleString();
+                } catch (e) {
+                    return timestamp.toString();
+                }
+            };
+
+            const photosHtml = place.photos && place.photos.length > 0 ? `
+                <div class="photos-section">
+                    <div class="detail-label">📸 Photos (${place.photos.length})</div>
+                    <div class="photos-grid">
+                        ${place.photos.map((photo, photoIndex) => `
+                            <div class="photo-item">
+                                <img src="${photo.url || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxNiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='}" 
+                                     alt="${photo.name || 'Photo'}" 
+                                     class="photo-img"
+                                     onclick="showPhoto('${photo.url}', '${photo.name || 'Photo'}')"
+                                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxNiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkVycm9yPC90ZXh0Pjwvc3ZnPg=='; this.title='Failed to load image';">
+                                <div class="photo-info">
+                                    <div><strong>${photo.name || 'Unnamed'}</strong></div>
+                                    <div>${photo.size ? (photo.size / 1024).toFixed(1) + ' KB' : 'Unknown size'}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : '<div class="detail-item"><div class="detail-label">📸 Photos</div><div class="detail-value">No photos</div></div>';
+
+            return `
+                <div class="place-card">
+                    <div class="place-header">
+                        <h3>📍 Place #${index + 1}</h3>
+                        <div class="place-id">ID: ${place.id}</div>
+                    </div>
+                    
+                    <div class="place-details">
+                        <div class="detail-item">
+                            <div class="detail-label">🌍 Coordinates</div>
+                            <div class="detail-value">
+                                Lat: ${place.latitude || 'N/A'}<br>
+                                Lng: ${place.longitude || 'N/A'}
+                            </div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">📍 Address</div>
+                            <div class="detail-value">${place.addressDetail || 'N/A'}</div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">🗿 Landmark</div>
+                            <div class="detail-value">${place.landmark || 'N/A'}</div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">📅 Created</div>
+                            <div class="detail-value">${formatDate(place.createdAt)}</div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">📝 Submitted</div>
+                            <div class="detail-value">${place.submittedAt || 'N/A'}</div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">📊 Photo Count</div>
+                            <div class="detail-value">${place.photoCount || 0}</div>
+                        </div>
+                    </div>
+                    
+                    ${photosHtml}
+                </div>
+            `;
+        }
+
+        function updateStats(data) {
+            const stats = document.getElementById('stats');
+            const totalPhotos = data.reduce((sum, place) => sum + (place.photoCount || 0), 0);
+            stats.innerHTML = `📊 Total Places: ${data.length} | 📸 Total Photos: ${totalPhotos}`;
+        }
+
+        function showPhoto(url, name) {
+            const modal = document.getElementById('photoModal');
+            const modalImg = document.getElementById('modalImg');
+            modal.style.display = 'block';
+            modalImg.src = url;
+            modalImg.alt = name;
+        }
+
+        function closeModal() {
+            document.getElementById('photoModal').style.display = 'none';
+        }
+
+        function exportData() {
+            if (allData.length === 0) {
+                alert('No data to export. Please load data first.');
+                return;
+            }
+
+            const dataStr = JSON.stringify(allData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `trace-the-path-data-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            URL.revokeObjectURL(url);
+            
+            // Show success message
+            const container = document.getElementById('dataContainer');
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.innerHTML = '✅ Data exported successfully!';
+            container.insertBefore(successDiv, container.firstChild);
+            
+            setTimeout(() => {
+                successDiv.remove();
+            }, 3000);
+        }
+
+        // Load data when page loads
+        window.addEventListener('load', loadData);
+
+        // Close modal when clicking outside the image
+        window.onclick = function(event) {
+            const modal = document.getElementById('photoModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
