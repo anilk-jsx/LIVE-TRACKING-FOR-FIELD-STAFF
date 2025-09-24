@@ -19,7 +19,8 @@
         "longitude": 85.3240,
         "addressDetail": "Kathmandu, Nepal",
         "landmark": "Near Durbar Marg",
-        "wardNumber": "15"
+        "wardNumber": "15",
+        "ward": 1
       },
       "submissionTime": {
         "timestamp": serverTimestamp(),

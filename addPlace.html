@@ -826,60 +826,7 @@
 
                 <div class="form-group">
                     <label for="wardNumber">Ward Number <span class="required">*</span></label>
-                    <select id="wardNumber" name="wardNumber" required>
-                        <option value="">Select Ward Number</option>
-                        <option value="1">Ward 1</option>
-                        <option value="2">Ward 2</option>
-                        <option value="3">Ward 3</option>
-                        <option value="4">Ward 4</option>
-                        <option value="5">Ward 5</option>
-                        <option value="6">Ward 6</option>
-                        <option value="7">Ward 7</option>
-                        <option value="8">Ward 8</option>
-                        <option value="9">Ward 9</option>
-                        <option value="10">Ward 10</option>
-                        <option value="11">Ward 11</option>
-                        <option value="12">Ward 12</option>
-                        <option value="13">Ward 13</option>
-                        <option value="14">Ward 14</option>
-                        <option value="15">Ward 15</option>
-                        <option value="16">Ward 16</option>
-                        <option value="17">Ward 17</option>
-                        <option value="18">Ward 18</option>
-                        <option value="19">Ward 19</option>
-                        <option value="20">Ward 20</option>
-                        <option value="21">Ward 21</option>
-                        <option value="22">Ward 22</option>
-                        <option value="23">Ward 23</option>
-                        <option value="24">Ward 24</option>
-                        <option value="25">Ward 25</option>
-                        <option value="26">Ward 26</option>
-                        <option value="27">Ward 27</option>
-                        <option value="28">Ward 28</option>
-                        <option value="29">Ward 29</option>
-                        <option value="30">Ward 30</option>
-                        <option value="31">Ward 31</option>
-                        <option value="32">Ward 32</option>
-                        <option value="33">Ward 33</option>
-                        <option value="34">Ward 34</option>
-                        <option value="35">Ward 35</option>
-                        <option value="36">Ward 36</option>
-                        <option value="37">Ward 37</option>
-                        <option value="38">Ward 38</option>
-                        <option value="39">Ward 39</option>
-                        <option value="40">Ward 40</option>
-                        <option value="41">Ward 41</option>
-                        <option value="42">Ward 42</option>
-                        <option value="43">Ward 43</option>
-                        <option value="44">Ward 44</option>
-                        <option value="45">Ward 45</option>
-                        <option value="46">Ward 46</option>
-                        <option value="47">Ward 47</option>
-                        <option value="48">Ward 48</option>
-                        <option value="49">Ward 49</option>
-                        <option value="50">Ward 50</option>
-                        <option value="other">Other</option>
-                    </select>
+                    <input type="number" id="wardNumber" name="wardNumber" required>
                 </div>
             </div>
 
@@ -1128,7 +1075,7 @@
             );
         });
 
-        // Reverse geocoding to get address
+        // Update the reverse geocoding function to include ward number extraction
         async function reverseGeocode(lat, lng) {
             try {
                 // Option 1: Use a CORS proxy service
@@ -1148,6 +1095,12 @@
                         if (landmark) {
                             landmarkInput.value = landmark;
                         }
+
+                        // Extract ward number from address components
+                        const wardNumber = extractWardNumber(data);
+                        if (wardNumber) {
+                            document.getElementById('wardNumber').value = wardNumber;
+                        }
                     }
                 } else {
                     // Fallback to manual address entry
@@ -1162,40 +1115,61 @@
                 throw error;
             }
         }
-
-        // Alternative reverse geocoding function with multiple fallbacks
+        // Alternative reverse geocoding function with multiple fallbacks including ward number
         async function reverseGeocodeWithFallbacks(lat, lng) {
             const fallbackMethods = [
-                // Method 1: AllOrigins CORS proxy
+                // Method 1: AllOrigins CORS proxy with Nominatim
                 async () => {
                     const proxyUrl = 'https://api.allorigins.win/raw?url=';
                     const apiUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
                     const response = await fetch(proxyUrl + encodeURIComponent(apiUrl));
-                    return response.json();
-                },
-
-                // Method 2: CORS-Anywhere proxy (if available)
-                async () => {
-                    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-                    const apiUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
-                    const response = await fetch(proxyUrl + apiUrl);
-                    return response.json();
-                },
-
-                // Method 3: BigDataCloud API (free alternative)
-                async () => {
-                    const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
                     const data = await response.json();
+
+                    // Extract ward number from Nominatim data
+                    const wardNumber = extractWardNumber(data);
+
                     return {
-                        display_name: data.locality ?
-                            `${data.locality}, ${data.principalSubdivision}, ${data.countryName}` :
-                            `${data.principalSubdivision}, ${data.countryName}`,
-                        address: {
-                            city: data.city,
-                            locality: data.locality,
-                            principalSubdivision: data.principalSubdivision,
-                            countryName: data.countryName
+                        ...data,
+                        wardNumber: wardNumber
+                    };
+                },
+
+                // Method 2: BigDataCloud API (free alternative)
+                async () => {
+                    const overpassQuery = `
+                [out:json][timeout:10];
+                (
+                  relation["admin_level"~"^(8|9|10)$"]["boundary"="administrative"](around:1000,${lat},${lng});
+                );
+                out geom;
+            `;
+
+                    const overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
+                    const proxyUrl = 'https://api.allorigins.win/raw?url=';
+
+                    const response = await fetch(proxyUrl + encodeURIComponent(overpassUrl));
+                    const data = await response.json();
+
+                    let wardNumber = null;
+                    if (data.elements && data.elements.length > 0) {
+                        // Look for ward information in the administrative boundaries
+                        for (const element of data.elements) {
+                            if (element.tags) {
+                                const name = element.tags.name;
+                                if (name && (name.toLowerCase().includes('ward') || name.match(/\d+/))) {
+                                    const match = name.match(/ward\s*(\d+)|(\d+)\s*ward/i);
+                                    if (match) {
+                                        wardNumber = match[1] || match[2];
+                                        break;
+                                    }
+                                }
+                            }
                         }
+                    }
+
+                    return {
+                        display_name: `Administrative Area near ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+                        wardNumber: wardNumber
                     };
                 }
             ];
@@ -1221,6 +1195,12 @@
                             }
                         }
 
+                        // Set ward number if found
+                        if (data.wardNumber) {
+                            document.getElementById('wardNumber').value = data.wardNumber;
+                            console.log(`Ward number found: ${data.wardNumber}`);
+                        }
+
                         console.log(`Geocoding successful with method ${i + 1}`);
                         return;
                     }
@@ -1237,6 +1217,93 @@
             throw new Error('All geocoding methods failed');
         }
 
+        // Function to extract ward number from Nominatim data
+        function extractWardNumber(data) {
+            if (!data.address) return null;
+
+            const address = data.address;
+
+            // Common ward-related fields in different countries/regions
+            const wardFields = [
+                'ward', 'district', 'suburb', 'neighbourhood', 'quarter',
+                'city_district', 'borough', 'subdistrict', 'administrative'
+            ];
+
+            // Check each field for ward number
+            for (const field of wardFields) {
+                if (address[field]) {
+                    const value = address[field].toString();
+
+                    // Look for patterns like "Ward 5", "5th Ward", "District 12", etc.
+                    const wardMatches = [
+                        value.match(/ward\s*(\d+)/i),
+                        value.match(/(\d+)\s*ward/i),
+                        value.match(/district\s*(\d+)/i),
+                        value.match(/(\d+)\s*district/i),
+                        value.match(/zone\s*(\d+)/i),
+                        value.match(/(\d+)\s*zone/i),
+                        value.match(/^(\d+)$/), // Just a number
+                        value.match(/(\d+)/) // Any number in the string
+                    ];
+
+                    for (const match of wardMatches) {
+                        if (match && match[1]) {
+                            const wardNum = parseInt(match[1]);
+                            if (wardNum > 0 && wardNum < 1000) { // Reasonable ward number range
+                                return wardNum;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check display_name for ward information
+            if (data.display_name) {
+                const displayMatch = data.display_name.match(/ward\s*(\d+)|(\d+)\s*ward/i);
+                if (displayMatch) {
+                    const wardNum = parseInt(displayMatch[1] || displayMatch[2]);
+                    if (wardNum > 0 && wardNum < 1000) {
+                        return wardNum;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        // Function to extract ward number from BigDataCloud data
+        function extractWardNumberFromBigDataCloud(data) {
+            const searchFields = [
+                data.locality, data.localityInfo?.administrative?.[0]?.name,
+                data.localityInfo?.administrative?.[1]?.name,
+                data.localityInfo?.administrative?.[2]?.name,
+                data.city, data.principalSubdivision
+            ];
+
+            for (const field of searchFields) {
+                if (field) {
+                    const wardMatches = [
+                        field.match(/ward\s*(\d+)/i),
+                        field.match(/(\d+)\s*ward/i),
+                        field.match(/district\s*(\d+)/i),
+                        field.match(/(\d+)\s*district/i),
+                        field.match(/zone\s*(\d+)/i),
+                        field.match(/(\d+)\s*zone/i)
+                    ];
+
+                    for (const match of wardMatches) {
+                        if (match && match[1]) {
+                            const wardNum = parseInt(match[1]);
+                            if (wardNum > 0 && wardNum < 1000) {
+                                return wardNum;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
         // Show location status
         function showLocationStatus(message, type) {
             locationStatus.textContent = message;
@@ -1435,43 +1502,6 @@
                 handleFirebaseError(error);
             }
         }
-
-        /*async function uploadPhotosToFirebase(placeId, photos) {
-            try {
-                if (!window.firebaseStorage) {
-                    console.log('Firebase Storage not available, skipping photo upload');
-                    return;
-                }
-
-                const { ref, uploadBytes, getDownloadURL } = window.firebaseModules;
-                const photoUrls = [];
-
-                for (let i = 0; i < photos.length; i++) {
-                    const photo = photos[i];
-                    const photoRef = ref(window.firebaseStorage, `places/${placeId}/photo_${i + 1}_${Date.now()}`);
-
-                    try {
-                        const snapshot = await uploadBytes(photoRef, photo);
-                        const downloadURL = await getDownloadURL(snapshot.ref);
-                        photoUrls.push({
-                            name: photo.name,
-                            size: photo.size,
-                            type: photo.type,
-                            url: downloadURL,
-                            uploadedAt: new Date().toISOString()
-                        });
-                    } catch (uploadError) {
-                        console.warn(`Failed to upload photo ${photo.name}:`, uploadError);
-                    }
-                }
-
-                console.log(`Successfully uploaded ${photoUrls.length} photos`);
-                return photoUrls;
-
-            } catch (error) {
-                console.error('Error uploading photos:', error);
-            }
-        }*/
 
         function showSuccessMessage(formattedTime, photoCount = 0) {
             // Create success modal
