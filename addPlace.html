@@ -10,38 +10,34 @@
     <script type="module">
         // Import the functions you need from the SDKs you need
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-        import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+        import { getFirestore, collection, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
         // Your web app's Firebase configuration
-        // TODO: Replace with your Firebase config
         const firebaseConfig = {
             apiKey: "AIzaSyC3Fm6yUsQd2O-yD3HhccHIvGUAZKiP7u0",
             authDomain: "trace-the-path.firebaseapp.com",
             projectId: "trace-the-path",
-            storageBucket: "trace-the-path.firebasestorage.app",
+            storageBucket: "trace-the-path.firebasestorage.app", // Keep this even if not using Storage
             messagingSenderId: "818537545903",
             appId: "1:818537545903:web:50da1e17e4c3b457fed45a",
             measurementId: "G-5VP540RKTP"
         };
 
-
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const storage = getStorage(app);
 
-        // Make Firebase available globally
+        // Make Firebase available globally (only Firestore)
         window.firebaseApp = app;
         window.firebaseDB = db;
-        window.firebaseStorage = storage;
         window.firebaseModules = {
             collection,
             addDoc,
             serverTimestamp,
-            ref,
-            uploadBytes,
-            getDownloadURL
+            doc,
+            getDoc,
+            setDoc,
+            updateDoc
         };
     </script>
 
@@ -1358,11 +1354,12 @@
             });
         }
 
-        // Form submission
+        // Update the form submission to provide better photo count guidance
         form.addEventListener('submit', function (e) {
             e.preventDefault();
+            console.log('Form submitted');
 
-            // Validate required fields
+            // Validation
             const latitude = latitudeInput.value.trim();
             const longitude = longitudeInput.value.trim();
             const address = addressInput.value.trim();
@@ -1373,7 +1370,22 @@
                 return;
             }
 
-            // Capture exact submission time
+            // Check Firebase initialization
+            if (!window.firebaseDB) {
+                alert('Firebase is not initialized. Please refresh the page and try again.');
+                return;
+            }
+
+            // Updated photo count guidance for single document approach
+            if (selectedPhotos.length > 2) {
+                const confirmed = confirm(
+                    `You have ${selectedPhotos.length} photos selected. ` +
+                    'To ensure all daily submissions fit in one document, we recommend 2 or fewer photos per submission. ' +
+                    'Do you want to continue with all photos?'
+                );
+                if (!confirmed) return;
+            }
+
             const submissionTime = new Date();
             const formattedTime = submissionTime.toLocaleString('en-US', {
                 year: 'numeric',
@@ -1385,34 +1397,24 @@
                 hour12: true
             });
 
-            // Prepare form data
             const formData = {
-                id: Date.now(), // Simple ID generation
+                id: Date.now(),
                 latitude: parseFloat(latitude),
                 longitude: parseFloat(longitude),
                 addressDetail: address,
                 landmark: landmarkInput.value.trim() || 'Not specified',
                 wardNumber: wardNumber || 'Not specified',
                 dateTime: submissionTime.toISOString(),
-                submittedAt: formattedTime,
-                photos: selectedPhotos.map(file => ({
-                    name: file.name,
-                    size: file.size,
-                    type: file.type,
-                    data: null // In real app, you'd upload to server
-                }))
+                submittedAt: formattedTime
             };
 
             // Disable submit button
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<div class="spinner"></div>Converting photos...';
+            submitBtn.innerHTML = '<div class="spinner"></div>Processing and saving...';
 
-            // Convert photos to URLs first, then save to Firebase
-            convertPhotosToUrls(selectedPhotos).then(photoUrls => {
-                submitBtn.innerHTML = '<div class="spinner"></div>Saving to Firebase...';
-                saveToFirebase(formData, photoUrls, formattedTime);
-            }).catch(error => {
-                console.error('Error converting photos:', error);
+            // Save to Firebase (always to same day's document)
+            saveToFirebase(formData, selectedPhotos, formattedTime).catch(error => {
+                console.error('Error in form submission process:', error);
                 handleFirebaseError(error);
             });
         });
@@ -1450,6 +1452,7 @@
             return photoUrls;
         }
 
+        // Keep the existing convertFileToBase64 function
         function convertFileToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -1463,90 +1466,312 @@
             });
         }
 
-        // Firebase Integration Functions
-        async function saveToFirebase(formData, photoUrls, formattedTime) {
+        // Update getUserId function for single user
+        function getUserId() {
+            // For single user application, return a consistent user ID
+            let userId = localStorage.getItem('singleUserId');
+
+            if (!userId) {
+                // Generate a consistent user ID for the single user
+                userId = 'user123'; // You can change this to any ID you prefer
+                localStorage.setItem('singleUserId', userId);
+            }
+
+            return userId;
+        }
+
+        // Update the saveToFirebase function to always use the same document for the same day
+        async function saveToFirebase(formData, photoFiles, formattedTime) {
+            console.log('Starting saveToFirebase...');
+            console.log('FormData:', formData);
+            console.log('PhotoFiles:', photoFiles);
+
             try {
                 // Check if Firebase is available
                 if (!window.firebaseDB) {
                     throw new Error('Firebase not initialized. Please check your configuration.');
                 }
 
-                const { collection, addDoc, serverTimestamp } = window.firebaseModules;
+                console.log('Firebase DB available');
+                const { collection, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc } = window.firebaseModules;
 
-                // Prepare data for Firestore
+                // Generate user ID
+                const userId = getUserId();
+                const submissionDate = new Date().toISOString().split('T')[0];
+                const documentId = `${userId}_${submissionDate}`; // Same document for entire day
+
+                console.log('User ID:', userId);
+                console.log('Document ID:', documentId);
+
+                // Generate unique place ID
+                const timestamp = Date.now();
+                const placeId = `${userId}_place_${timestamp}`;
+
+                // Convert photos to base64 URLs with more aggressive compression if needed
+                console.log('Converting photos to base64 URLs...');
+                const photosData = [];
+
+                for (let i = 0; i < photoFiles.length; i++) {
+                    const file = photoFiles[i];
+                    try {
+                        // More aggressive compression to fit more in one document
+                        const resizedFile = await resizeImage(file, 600, 400, 0.5); // Smaller size, 50% quality
+                        const base64Url = await convertFileToBase64(resizedFile);
+
+                        console.log(`Photo ${i + 1} converted. Original: ${file.size} bytes, Compressed: ${resizedFile.size} bytes`);
+
+                        photosData.push({
+                            photoId: `photo_${i + 1}_${timestamp}`,
+                            name: file.name,
+                            type: file.type,
+                            size: resizedFile.size,
+                            originalSize: file.size,
+                            url: base64Url, // Base64 data URL
+                            uploadedAt: new Date().toISOString()
+                        });
+                    } catch (photoError) {
+                        console.error(`Failed to process photo ${i + 1}:`, photoError);
+                        photosData.push({
+                            photoId: `photo_${i + 1}_${timestamp}`,
+                            name: file.name,
+                            type: file.type,
+                            size: file.size,
+                            url: null,
+                            error: 'Processing failed',
+                            uploadedAt: new Date().toISOString()
+                        });
+                    }
+                }
+
+                console.log('Photos processing completed. Successfully processed:', photosData.filter(p => p.url).length);
+
+                // Prepare place data
+                const currentTime = new Date();
                 const placeData = {
-                    latitude: formData.latitude,
-                    longitude: formData.longitude,
-                    addressDetail: formData.addressDetail,
-                    landmark: formData.landmark,
-                    wardNumber: formData.wardNumber,
-                    dateTime: serverTimestamp(),
-                    submittedAt: formattedTime,
-                    createdAt: serverTimestamp(),
-                    photoCount: photoUrls ? photoUrls.length : 0,
-                    photos: photoUrls || [] // Array of photo objects with base64 URLs
+                    placeId: placeId,
+                    submissionOrder: 1, // Will be updated based on existing places
+                    location: {
+                        latitude: parseFloat(formData.latitude) || 0,
+                        longitude: parseFloat(formData.longitude) || 0,
+                        addressDetail: formData.addressDetail || '',
+                        landmark: formData.landmark || '',
+                        wardNumber: formData.wardNumber || '',
+                        ward: parseInt(formData.wardNumber) || null
+                    },
+                    submissionTime: {
+                        timestamp: currentTime,
+                        iso: currentTime.toISOString(),
+                        formatted: formattedTime
+                    },
+                    photos: photosData,
+                    photoCount: photosData.length
                 };
 
-                // Add place to Firestore
-                const docRef = await addDoc(collection(window.firebaseDB, 'places'), placeData);
-                console.log(`Place saved with ID: ${docRef.id} and ${placeData.photoCount} photo(s)`);
+                // Calculate document size for logging (but don't prevent saving)
+                const documentSize = JSON.stringify(placeData).length;
+                console.log('Estimated place data size:', documentSize, 'characters');
+
+                // Reference to the date-wise document
+                const docRef = doc(window.firebaseDB, 'userSubmissions', documentId);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    // Document exists for this day - always add to it
+                    console.log('Adding to existing document for today...');
+
+                    const existingData = docSnap.data();
+                    const updatedPlaces = [...(existingData.places || []), placeData];
+
+                    // Update submission order
+                    placeData.submissionOrder = updatedPlaces.length;
+
+                    // Update statistics
+                    const stats = {
+                        totalPlaces: updatedPlaces.length,
+                        totalPhotos: updatedPlaces.reduce((sum, place) => sum + (place.photoCount || 0), 0),
+                        firstSubmissionTime: existingData.stats?.firstSubmissionTime || currentTime.toISOString(),
+                        lastSubmissionTime: currentTime.toISOString()
+                    };
+
+                    console.log('Updating document with stats:', stats);
+
+                    // Check estimated size and warn user if getting large
+                    const existingSize = JSON.stringify(existingData).length;
+                    const totalSize = existingSize + documentSize;
+
+                    if (totalSize > 800000) { // 800KB warning threshold
+                        console.warn(`Document is getting large: ${totalSize} characters. Consider fewer/smaller photos.`);
+                    }
+
+                    await updateDoc(docRef, {
+                        places: updatedPlaces,
+                        stats: stats,
+                        lastUpdated: serverTimestamp()
+                    });
+
+                    console.log(`Place #${placeData.submissionOrder} added to today's document: ${documentId} (Total: ${stats.totalPlaces} places, ${stats.totalPhotos} photos)`);
+                } else {
+                    // Document doesn't exist for this day - create new one
+                    console.log('Creating new document for today...');
+
+                    placeData.submissionOrder = 1;
+
+                    const newDocument = {
+                        documentId: documentId,
+                        userId: userId,
+                        submissionDate: submissionDate,
+                        documentCreated: serverTimestamp(),
+                        lastUpdated: serverTimestamp(),
+                        stats: {
+                            totalPlaces: 1,
+                            totalPhotos: placeData.photoCount,
+                            firstSubmissionTime: currentTime.toISOString(),
+                            lastSubmissionTime: currentTime.toISOString()
+                        },
+                        places: [placeData]
+                    };
+
+                    console.log('New document data:', newDocument);
+
+                    await setDoc(docRef, newDocument);
+                    console.log(`New document created for today: ${documentId} with first place`);
+                }
+
+                console.log('Firebase operation completed successfully');
 
                 // Success feedback
-                showSuccessMessage(formattedTime, placeData.photoCount);
-
-                // Reset form
+                showSuccessMessage(formattedTime, placeData.photoCount, placeData.submissionOrder);
                 resetForm();
 
             } catch (error) {
                 console.error('Error saving to Firebase:', error);
+
+                // Special handling for document size limit error
+                if (error.code === 'invalid-argument' && error.message.includes('maximum allowed size')) {
+                    console.error('Document size limit reached. Suggesting workarounds...');
+
+                    // Show more specific error message with suggestions
+                    const sizeErrorMessage = `
+Document size limit exceeded! Here are some options:
+
+1. Use fewer photos (recommended: 2-3 per submission)
+2. Take smaller photos or reduce photo quality
+3. Continue tomorrow (new day = new document)
+4. Contact admin for data cleanup
+
+Would you like to try submitting with fewer photos?
+            `;
+
+                    if (confirm(sizeErrorMessage)) {
+                        // Re-enable form for user to modify
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = 'Add Place to Tracking System';
+                        alert('Please remove some photos and try again.');
+                        return;
+                    }
+                }
+
                 handleFirebaseError(error);
             }
         }
 
-        function showSuccessMessage(formattedTime, photoCount = 0) {
+        // Update the resizeImage function with more aggressive compression options
+        function resizeImage(file, maxWidth = 600, maxHeight = 400, quality = 0.5) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+
+                img.onload = function () {
+                    // Calculate new dimensions
+                    let { width, height } = img;
+
+                    // More aggressive resizing
+                    const aspectRatio = width / height;
+
+                    if (width > maxWidth || height > maxHeight) {
+                        if (aspectRatio > 1) {
+                            // Landscape
+                            width = maxWidth;
+                            height = maxWidth / aspectRatio;
+                        } else {
+                            // Portrait
+                            height = maxHeight;
+                            width = maxHeight * aspectRatio;
+                        }
+                    }
+
+                    // Ensure dimensions don't exceed limits
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width;
+                        width = maxWidth;
+                    }
+                    if (height > maxHeight) {
+                        width = (width * maxHeight) / height;
+                        height = maxHeight;
+                    }
+
+                    // Set canvas dimensions
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    // Draw and compress image
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Convert to blob with compression
+                    canvas.toBlob(resolve, file.type, quality);
+                };
+
+                img.src = URL.createObjectURL(file);
+            });
+        }
+
+        // Update success message to show submission order
+        function showSuccessMessage(formattedTime, photoCount = 0, submissionOrder = 1) {
             // Create success modal
             const modal = document.createElement('div');
             modal.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.8);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 2000;
-            `;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 2000;
+    `;
 
             const content = document.createElement('div');
             content.style.cssText = `
-                background: white;
-                padding: 30px;
-                border-radius: 15px;
-                text-align: center;
-                max-width: 400px;
-                color: #333;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            `;
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        text-align: center;
+        max-width: 400px;
+        color: #333;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    `;
 
             content.innerHTML = `
-                <div style="font-size: 3rem; margin-bottom: 20px;">🎉</div>
-                <h2 style="color: #4CAF50; margin-bottom: 15px;">Success!</h2>
-                <p style="margin-bottom: 10px;">Place added successfully to Firebase!</p>
-                ${photoCount > 0 ? `<p style="margin-bottom: 10px; color: #4CAF50;">📸 ${photoCount} photo${photoCount > 1 ? 's' : ''} uploaded as URL${photoCount > 1 ? 's' : ''}</p>` : ''}
-                <p style="font-size: 0.9rem; color: #666;">📅 Submitted on: ${formattedTime}</p>
-                <button onclick="closeModal()" style="
-                    margin-top: 20px;
-                    padding: 10px 20px;
-                    background: #4CAF50;
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 1rem;
-                ">OK</button>
-            `;
+        <div style="font-size: 3rem; margin-bottom: 20px;">🎉</div>
+        <h2 style="color: #4CAF50; margin-bottom: 15px;">Success!</h2>
+        <p style="margin-bottom: 10px;">Place #${submissionOrder} added successfully!</p>
+        ${photoCount > 0 ? `<p style="margin-bottom: 10px; color: #4CAF50;">📸 ${photoCount} photo${photoCount > 1 ? 's' : ''} uploaded</p>` : ''}
+        <p style="font-size: 0.9rem; color: #666;">📅 Submitted on: ${formattedTime}</p>
+        <p style="font-size: 0.8rem; color: #888;">📊 Stored in date-wise structure</p>
+        <button onclick="closeModal()" style="
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        ">OK</button>
+    `;
 
             modal.appendChild(content);
             document.body.appendChild(modal);
@@ -1565,26 +1790,81 @@
             }, 5000);
         }
 
+        // Add helper function to display current user info (optional)
+        function displayUserInfo() {
+            const userId = getUserId();
+            const today = new Date().toISOString().split('T')[0];
+
+            console.log(`Current User: ${userId}`);
+            console.log(`Today's Document ID: ${userId}_${today}`);
+
+            // Optionally add a small indicator in the UI
+            const userInfo = document.createElement('div');
+            userInfo.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        z-index: 1000;
+    `;
+            userInfo.textContent = `User: ${userId.substring(0, 12)}...`;
+            document.body.appendChild(userInfo);
+        }
+
+        // Initialize user info display
+        setTimeout(displayUserInfo, 2000);
+
+        // Enhanced error handling function
         function handleFirebaseError(error) {
             let errorMessage = 'Failed to save data to Firebase. ';
+
+            // Log detailed error information
+            console.error('=== FIREBASE ERROR DETAILS ===');
+            console.error('Error name:', error.name);
+            console.error('Error message:', error.message);
+            console.error('Error code:', error.code);
+            console.error('Error stack:', error.stack);
+            console.error('================================');
 
             if (error.code === 'permission-denied') {
                 errorMessage += 'Permission denied. Please check Firebase security rules.';
             } else if (error.code === 'unavailable') {
                 errorMessage += 'Firebase is temporarily unavailable. Please try again.';
-            } else if (error.message.includes('not initialized')) {
+            } else if (error.message && error.message.includes('not initialized')) {
                 errorMessage += 'Please configure Firebase properly.';
+            } else if (error.message && error.message.includes('serverTimestamp')) {
+                errorMessage += 'Firebase timestamp error. The data structure may need adjustment.';
+            } else if (error.name === 'TypeError') {
+                errorMessage += 'Data type error. Please check the form inputs.';
             } else {
-                errorMessage += 'Please check your internet connection and try again.';
+                errorMessage += `Error: ${error.message || 'Unknown error occurred'}. Please check your internet connection and try again.`;
             }
 
             alert(errorMessage);
-            console.error('Firebase Error Details:', error);
 
             // Re-enable submit button
             submitBtn.disabled = false;
             submitBtn.innerHTML = 'Add Place to Tracking System';
         }
+
+        // Add Firebase connection test function
+        function testFirebaseConnection() {
+            console.log('=== FIREBASE CONNECTION TEST ===');
+            console.log('firebaseApp:', window.firebaseApp);
+            console.log('firebaseDB:', window.firebaseDB);
+            console.log('firebaseModules:', window.firebaseModules);
+            console.log('Available modules:', Object.keys(window.firebaseModules || {}));
+            console.log('===============================');
+        }
+
+        // Test Firebase connection after initialization
+        setTimeout(() => {
+            testFirebaseConnection();
+        }, 2000);
 
         function resetForm() {
             form.reset();
