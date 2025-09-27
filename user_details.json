@@ -1,18 +1,39 @@
-[
-  {
-    "id": 1,
-    "username": "user01",
-    "name": "Amit Kumar",
-    "designation": "Field Surveyor",
-    "state": "Odisha",
-    "district": "Khurda",
-    "block_mc_nac_town": "Bhubaneswar MC",
-    "gp_ward": "Ward 12",
-    "village_street": "Saheed Nagar Main Road",
-    "reportingAuthority": "District Officer",
-    "mobileNumber": "9876543210",
-    "mailId": "amit.kumar@example.com"
-  },
+{
+  "users": {
+    "120999": {
+      "id": "120999",
+      "name": "Mahesh Kumar",
+      "password": "mahesh123",
+      "role": "Booth Level Officer",
+      "designation": "Booth Level Officer",
+      "state": "Odisha",
+      "district": "Khurda",
+      "block_mc_nac_town": "Bhubaneswar Block",
+      "gp_ward": "Kalyanpur G.P",
+      "village_street": "Kalyanpur Village",
+      "reportingAuthority": "Block Officer",
+      "mobileNumber": "9876543210",
+      "mailId": "mahesh.kumar@bhubaneswar.gov.in",
+      "avatar": "MK",
+      "active": true
+    },
+    "user01": {
+      "id": "user01",
+      "name": "Amit Kumar",
+      "password": "amit123",
+      "role": "Field Surveyor",
+      "designation": "Field Surveyor",
+      "state": "Odisha",
+      "district": "Khurda",
+      "block_mc_nac_town": "Bhubaneswar MC",
+      "gp_ward": "Ward 12",
+      "village_street": "Saheed Nagar Main Road",
+      "reportingAuthority": "District Officer",
+      "mobileNumber": "9876543210",
+      "mailId": "amit.kumar@example.com",
+      "avatar": "AK",
+      "active": true
+    },
   {
     "id": 2,
     "username": "user02",
