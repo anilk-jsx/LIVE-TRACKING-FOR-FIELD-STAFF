@@ -651,13 +651,21 @@
                 emailInput.focus();
                 return false;
             }
-
+            if(email.indexOf('@') === -1 || email.indexOf('.') === -1){
+                showError('Please enter a valid email address');
+                emailInput.focus();
+                return false;
+            }
             if (!password) {
                 showError('Please enter your password');
                 passwordInput.focus();
                 return false;
             }
-
+            if(password.length < 6){
+                showError('Password must be at least 6 characters long');
+                passwordInput.focus();
+                return false;
+            }
             return true;
         }
 
