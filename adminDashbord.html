@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#6366f1">
     <title>Admin Dashboard - TRACE THE PATH</title>
@@ -1737,10 +1737,8 @@
                 if (window.firebaseAuth) {
                     window.onAuthStateChanged(window.firebaseAuth, (user) => {
                         if (user) {
-                            console.log('User authenticated:', user.email);
                             loadOfficers();
                         } else {
-                            console.log('User not authenticated');
                             // Redirect to login if not authenticated
                             window.location.href = 'login.html';
                         }
@@ -1842,7 +1840,6 @@
                 const downloadURL = await window.getDownloadURL(snapshot.ref);
                 return downloadURL;
             } catch (error) {
-                console.error('Error uploading photo:', error);
                 throw error;
             }
         }
@@ -1902,7 +1899,7 @@
                 officerData.updatedAt = window.serverTimestamp();
                 
                 // Save to Firestore
-                await window.addDoc(window.collection(window.firebaseDB, 'officers'), officerData);
+                await window.addDoc(window.collection(window.firebaseDB, 'users'), officerData);
                 
                 showMessage('success', 'Officer created successfully!');
                 
@@ -1912,7 +1909,6 @@
                 }, 2000);
                 
             } catch (error) {
-                console.error('Error creating officer:', error);
                 showMessage('error', error.message || 'Error creating officer. Please try again.');
             } finally {
                 submitBtn.disabled = false;
@@ -1931,7 +1927,6 @@
                 const querySnapshot = await window.getDocs(q);
                 return !querySnapshot.empty;
             } catch (error) {
-                console.error('Error checking officer existence:', error);
                 return false;
             }
         }
@@ -1963,7 +1958,6 @@
                 displayOfficers(filteredOfficersData);
                 
             } catch (error) {
-                console.error('Error loading officers:', error);
                 showMessage('error', 'Error loading officers. Please try again.');
             } finally {
                 showLoadingOfficers(false);
@@ -2044,7 +2038,6 @@
                 showMessage('success', 'Officer deleted successfully');
                 loadOfficers();
             } catch (error) {
-                console.error('Error deleting officer:', error);
                 showMessage('error', 'Error deleting officer. Please try again.');
             }
         }
@@ -2167,7 +2160,6 @@
                         window.location.href = 'login.html';
                     }
                 } catch (error) {
-                    console.error('Error during logout:', error);
                     showMessage('error', 'Error during logout. Redirecting...');
                     
                     // Redirect anyway after error
