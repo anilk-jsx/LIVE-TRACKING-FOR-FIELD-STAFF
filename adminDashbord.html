@@ -1570,6 +1570,57 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="constituency">Constituency <span class="required">*</span></label>
+                        <select id="constituency" name="constituency" required>
+                            <option value="">Select Constituency</option>
+                            <option value="Bhubaneswar North">Bhubaneswar North</option>
+                            <option value="Bhubaneswar Central">Bhubaneswar Central</option>
+                            <option value="Ekamra-Bhubaneswar">Ekamra-Bhubaneswar</option>
+                            <option value="Jatni">Jatni</option>
+                            <option value="Begunia">Begunia</option>
+                            <option value="Khurda">Khurda</option>
+                            <option value="Chilika">Chilika</option>
+                            <option value="Ranpur">Ranpur</option>
+                            <option value="Cuttack-Sadar">Cuttack-Sadar</option>
+                            <option value="Cuttack-Choudwar">Cuttack-Choudwar</option>
+                            <option value="Salepur">Salepur</option>
+                            <option value="Mahanga">Mahanga</option>
+                            <option value="Kantapada">Kantapada</option>
+                            <option value="Niali">Niali</option>
+                            <option value="Paradeep">Paradeep</option>
+                            <option value="Kendrapara">Kendrapara</option>
+                            <option value="Aul">Aul</option>
+                            <option value="Rajnagar">Rajnagar</option>
+                            <option value="Mahakalapada">Mahakalapada</option>
+                            <option value="Kakatpur">Kakatpur</option>
+                            <option value="Nimapada">Nimapada</option>
+                            <option value="Gop">Gop</option>
+                            <option value="Puri">Puri</option>
+                            <option value="Brahmagiri">Brahmagiri</option>
+                            <option value="Satyabadi">Satyabadi</option>
+                            <option value="Pipili">Pipili</option>
+                            <option value="Delanga">Delanga</option>
+                            <option value="Balasore">Balasore</option>
+                            <option value="Remuna">Remuna</option>
+                            <option value="Jaleswar">Jaleswar</option>
+                            <option value="Bhograi">Bhograi</option>
+                            <option value="Basta">Basta</option>
+                            <option value="Baliapal">Baliapal</option>
+                            <option value="Baripada">Baripada</option>
+                            <option value="Udala">Udala</option>
+                            <option value="Rairangpur">Rairangpur</option>
+                            <option value="Bangriposi">Bangriposi</option>
+                            <option value="Karanjia">Karanjia</option>
+                            <option value="Sambalpur">Sambalpur</option>
+                            <option value="Kuchinda">Kuchinda</option>
+                            <option value="Rengali">Rengali</option>
+                            <option value="Brajarajnagar">Brajarajnagar</option>
+                            <option value="Jharsuguda">Jharsuguda</option>
+                            <option value="Deogarh">Deogarh</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
                         <label for="block">Block <span class="required">*</span></label>
                         <select id="block" name="block" required onchange="updateGpWards()">
                             <option value="">Select Block</option>
@@ -1659,6 +1710,7 @@
                             <th>Email</th>
                             <th>Phone</th>
                             <th>District</th>
+                            <th>Constituency</th>
                             <th>Block</th>
                             <th>GP/Ward</th>
                             <th>Role</th>
@@ -1867,7 +1919,7 @@
                 }
                 
                 // Validate required fields
-                const requiredFields = ['name', 'id', 'email', 'phone', 'district', 'block', 'gpWard', 'role'];
+                const requiredFields = ['name', 'id', 'email', 'phone', 'district', 'constituency', 'block', 'gpWard', 'role'];
                 const missingFields = requiredFields.filter(field => !officerData[field]);
                 
                 if (missingFields.length > 0) {
@@ -1969,7 +2021,7 @@
             const tableBody = document.getElementById('officersTableBody');
             
             if (officers.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 40px; color: #666;">No officers found</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 40px; color: #666;">No officers found</td></tr>';
                 return;
             }
             
@@ -1986,6 +2038,7 @@
                     <td data-label="Email">${officer.email}</td>
                     <td data-label="Phone">${officer.phone}</td>
                     <td data-label="District">${officer.district}</td>
+                    <td data-label="Constituency">${officer.constituency || 'N/A'}</td>
                     <td data-label="Block">${officer.block}</td>
                     <td data-label="GP/Ward">${officer.gpWard}</td>
                     <td data-label="Role">${officer.role}</td>
