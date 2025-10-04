@@ -1003,31 +1003,6 @@
 
         /* Landscape mode optimizations for small devices */
         @media (max-width: 768px) and (orientation: landscape) {
-            .dashboard-nav {
-                padding: 4px 15px;
-                height: 45px; /* Even smaller height for landscape mode */
-            }
-
-            .nav-content {
-                flex-direction: row;
-                align-items: center;
-                justify-content: space-between;
-            }
-
-            .nav-brand {
-                font-size: 0.9rem;
-            }
-
-            .mobile-menu-toggle {
-                padding: 6px;
-            }
-
-            .hamburger-line {
-                width: 18px;
-                height: 2px;
-                margin: 2px 0;
-            }
-
             .container {
                 padding-top: 55px; /* Adjusted for smaller navbar in landscape */
             }
@@ -1209,27 +1184,6 @@
                 padding: 60px 8px 15px; /* Adjusted for consistent navbar height on very small screens */
             }
 
-            .dashboard-nav {
-                padding: 6px 12px;
-                height: 50px; /* Smaller fixed height for very small screens */
-                min-height: unset; /* Remove min-height */
-            }
-
-            .nav-brand {
-                font-size: 0.95rem;
-                margin-bottom: 0; /* Remove bottom margin */
-            }
-
-            .mobile-menu-toggle {
-                padding: 6px; /* Smaller padding for very small screens */
-            }
-
-            .hamburger-line {
-                width: 20px; /* Slightly smaller hamburger lines */
-                height: 2px;
-                margin: 2px 0;
-            }
-
             .form-container, .list-container {
                 padding: 20px 10px;
                 margin: 10px 2px;
@@ -1340,12 +1294,6 @@
                 font-size: 0.85rem;
                 margin: 10px 0;
             }
-        }
-
-        /* Navbar scroll effect */
-        .dashboard-nav.scrolled {
-            background: rgba(255, 255, 255, 0.2);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
         }
 
         /* Dark mode support (optional) */
@@ -1621,18 +1569,7 @@
             
             document.getElementById('officerName').focus();
 
-            // Add scroll effect to navbar
-            const navbar = document.querySelector('.dashboard-nav');
-            
-            window.addEventListener('scroll', function() {
-                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-                
-                if (scrollTop > 50) {
-                    navbar.classList.add('scrolled');
-                } else {
-                    navbar.classList.remove('scrolled');
-                }
-            });
+            // Note: Removed navbar scroll effect as it was targeting non-existent elements
         });
 
         // Note: updateBlocks() and updateGpWards() functions removed since 
