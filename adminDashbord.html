@@ -1474,11 +1474,6 @@
                     <option value="Balasore">Balasore</option>
                     <option value="Sambalpur">Sambalpur</option>
                 </select>
-                <select class="filter-select" id="statusFilter" onchange="filterOfficers()">
-                    <option value="">All Status</option>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                </select>
                 <button class="nav-btn" onclick="loadOfficers()">Refresh</button>
             </div>
 
@@ -1711,11 +1706,7 @@
                 
                 // Add metadata
                 officerData.createdAt = window.serverTimestamp();
-                officerData.status = 'Active';
-                officerData.createdBy = 'Admin';
                 officerData.updatedAt = window.serverTimestamp();
-                officerData.accountType = 'officer'; // Distinguish from admin accounts
-                officerData.isEmailVerified = false;
                 officerData.lastLogin = null;
                 
                 // Step 1: Create Firebase Auth account with email and password "pwd@123"
@@ -1728,10 +1719,6 @@
                         'pwd@123'
                     );
                     console.log('Firebase Auth account created successfully:', userAuthRecord.user.uid);
-                    
-                    // Add the Firebase Auth UID to officer data
-                    officerData.firebaseUID = userAuthRecord.user.uid;
-                    officerData.defaultPassword = 'pwd@123'; // Store for reference (consider encrypting in production)
                     
                 } catch (authError) {
                     console.error('Error creating Firebase Auth account:', authError);
@@ -1838,7 +1825,6 @@
                 
                 const q = window.query(
                     window.collection(window.firebaseDB, 'users'),
-                    window.where('accountType', '==', 'officer'),
                     window.orderBy('createdAt', 'desc')
                 );
                 
@@ -1893,8 +1879,8 @@
                     <td data-label="Role">${officer.role}</td>
                     <td data-label="Reporting To">${officer.reportingTo || 'N/A'}</td>
                     <td data-label="Status">
-                        <span class="status-badge ${officer.status === 'Active' ? 'status-active' : 'status-inactive'}">
-                            ${officer.status || 'Active'}
+                        <span class="status-badge status-active">
+                            Active
                         </span>
                     </td>
                     <td data-label="Actions">
@@ -1911,7 +1897,7 @@
         function filterOfficers() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             const districtFilter = document.getElementById('districtFilter').value;
-            const statusFilter = document.getElementById('statusFilter').value;
+            // Removed status filter since status field is no longer stored
             
             filteredOfficersData = officersData.filter(officer => {
                 const matchesSearch = !searchTerm || 
@@ -1921,9 +1907,9 @@
                     officer.district.toLowerCase().includes(searchTerm);
                 
                 const matchesDistrict = !districtFilter || officer.district === districtFilter;
-                const matchesStatus = !statusFilter || (officer.status || 'Active') === statusFilter;
+                // Removed status filtering since status field is no longer stored
                 
-                return matchesSearch && matchesDistrict && matchesStatus;
+                return matchesSearch && matchesDistrict;
             });
             
             displayOfficers(filteredOfficersData);
