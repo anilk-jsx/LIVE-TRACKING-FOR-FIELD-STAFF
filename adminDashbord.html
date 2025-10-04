@@ -544,6 +544,25 @@
             grid-column: 1 / -1;
         }
 
+        /* Readonly input styles */
+        .form-group input[readonly] {
+            background-color: #f8fafc !important;
+            color: #64748b !important;
+            cursor: not-allowed;
+            border-color: #e2e8f0 !important;
+        }
+
+        .form-group input[readonly]:hover {
+            border-color: #e2e8f0 !important;
+            background-color: #f8fafc !important;
+        }
+
+        .form-group input[readonly]:focus {
+            border-color: #e2e8f0 !important;
+            background-color: #f8fafc !important;
+            box-shadow: none !important;
+        }
+
         .photo-upload {
             position: relative;
             border: 2px solid var(--medium-gray);
@@ -1377,7 +1396,7 @@
 
                     <div class="form-group">
                         <label for="officerId">Officer ID <span class="required">*</span></label>
-                        <input type="text" id="officerId" name="id" required placeholder="Enter unique officer ID">
+                        <input type="text" id="officerId" name="id" required placeholder="Auto-generated ID" readonly>
                     </div>
 
                     <div class="form-group">
@@ -1517,6 +1536,60 @@
             'Nayagarh', 'Nuapada', 'Puri', 'Rayagada', 'Sambalpur', 'Subarnapur', 'Sundargarh'
         ];
 
+        // Generate unique officer ID
+        function generateOfficerID() {
+            const prefix = 'TTP'; // TRACE THE PATH prefix
+            const timestamp = Date.now().toString().slice(-6); // Last 6 digits of timestamp
+            const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0'); // 3-digit random number
+            return `${prefix}${timestamp}${random}`;
+        }
+
+        // Check if generated officer ID is unique
+        async function ensureUniqueOfficerID() {
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (attempts < maxAttempts) {
+                const generatedID = generateOfficerID();
+                const exists = await checkOfficerExists(generatedID);
+                
+                if (!exists) {
+                    return generatedID;
+                }
+                
+                attempts++;
+                console.log(`Officer ID ${generatedID} already exists, generating new one...`);
+            }
+            
+            // If all attempts fail, use timestamp-based fallback
+            return `TTP${Date.now()}`;
+        }
+
+        // Generate and set officer ID in the form
+        async function generateAndSetOfficerID() {
+            try {
+                const officerIdField = document.getElementById('officerId');
+                officerIdField.value = 'Generating...';
+                
+                // Wait a bit for Firebase to initialize if needed
+                setTimeout(async () => {
+                    try {
+                        const uniqueID = await ensureUniqueOfficerID();
+                        officerIdField.value = uniqueID;
+                        console.log('Generated unique officer ID:', uniqueID);
+                    } catch (error) {
+                        console.error('Error generating officer ID:', error);
+                        // Fallback to timestamp-based ID
+                        officerIdField.value = `TTP${Date.now()}`;
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Error in generateAndSetOfficerID:', error);
+                document.getElementById('officerId').value = `TTP${Date.now()}`;
+            }
+        }
+
         // Initialize districts dropdown on page load
         function initializeDistricts() {
             const districtSelect = document.getElementById('district');
@@ -1539,6 +1612,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Initialize static district dropdown
             initializeDistricts();
+            
+            // Generate and set officer ID when page loads
+            generateAndSetOfficerID();
             
             // Wait for Firebase to be initialized
             setTimeout(() => {
@@ -1664,12 +1740,6 @@
                 if (!emailRegex.test(officerData.email)) {
                     throw new Error('Please enter a valid email address');
                 }
-                
-                // Check if officer ID already exists
-                const existingOfficer = await checkOfficerExists(officerData.id);
-                if (existingOfficer) {
-                    throw new Error('Officer ID already exists. Please use a different ID.');
-                }
 
                 // Check if email already exists in our users collection
                 const existingEmail = await checkEmailExists(officerData.email);
@@ -1762,10 +1832,14 @@
                     throw new Error(`Error saving officer data: ${firestoreError.message}`);
                 }
                 
-                showMessage('success', `✅ Officer Account Created Successfully!\n\n📧 Email: ${officerData.email}\n🔑 Password: pwd@123\n📷 Photo: ${photoProcessStatus}\n\nThe officer can now log in using these credentials.`);
+                // Show success alert
+                alert('User created successfully!');
                 
                 // Clear the form after successful submission
                 document.getElementById('officerForm').reset();
+                
+                // Generate new officer ID for next entry
+                generateAndSetOfficerID();
                 
                 // Clear photo preview
                 const photoPreview = document.getElementById('photoPreview');
@@ -1780,7 +1854,7 @@
                 }, 2000);
                 
             } catch (error) {
-                showMessage('error', error.message || 'Error creating officer. Please try again.');
+                alert(error.message || 'Error creating officer. Please try again.');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
