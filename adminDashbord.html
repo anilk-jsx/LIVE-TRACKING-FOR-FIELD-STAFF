@@ -91,6 +91,11 @@
             box-sizing: border-box;
         }
 
+        html {
+            scroll-behavior: smooth;
+            overflow-y: auto; /* Ensure vertical scrolling is available */
+        }
+
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--light-gray);
@@ -99,6 +104,8 @@
             display: flex;
             flex-direction: column;
             line-height: 1.6;
+            overflow-x: hidden; /* Prevent horizontal scroll on body */
+            overflow-y: auto; /* Allow vertical scroll for entire page */
         }
 
         .container {
@@ -743,112 +750,606 @@
         }
 
         /* Officers Table Styles */
+        .officers-table-container {
+            overflow-x: auto; /* Only horizontal scroll for wide tables */
+            overflow-y: hidden; /* Completely prevent vertical scrollbar */
+            margin-top: 30px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            position: relative;
+        }
+
         .officers-table {
             width: 100%;
-            border-collapse: collapse;
-            margin-top: 30px;
-            border-radius: var(--border-radius);
-            overflow: hidden;
-            box-shadow: var(--shadow-md);
+            border-collapse: separate;
+            border-spacing: 0;
+            border-radius: 16px;
+            overflow: visible;
+            background: white;
+            border: 1px solid #e2e8f0;
+            min-width: 1200px; /* Ensure minimum width for proper display */
         }
 
         .officers-table th,
         .officers-table td {
-            padding: 16px 12px;
+            padding: 20px 16px;
             text-align: left;
-            border-bottom: 1px solid var(--medium-gray);
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
         }
 
         .officers-table th {
-            background: var(--light-gray);
-            font-weight: 600;
-            color: var(--text-primary);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-weight: 700;
+            color: white;
             position: sticky;
             top: 0;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.1em;
+            z-index: 150;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            border-bottom: none;
         }
 
-        .officers-table tr {
-            transition: var(--transition);
+        .officers-table th:first-child {
+            border-top-left-radius: 16px;
         }
 
-        .officers-table tr:hover {
-            background: #f8fafc;
-            transform: scale(1.002);
+        .officers-table th:last-child {
+            border-top-right-radius: 16px;
         }
 
-        .officers-table tr:nth-child(even) {
-            background: rgba(248, 250, 252, 0.5);
+        .officers-table tbody tr {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: white;
+        }
+
+        .officers-table tbody tr:hover {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .officers-table tbody tr:nth-child(even) {
+            background: #fafbfc;
+        }
+
+        .officers-table tbody tr:nth-child(even):hover {
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        }
+
+        .officers-table td {
+            font-size: 0.95rem;
+            color: #374151;
+            font-weight: 500;
+        }
+
+        /* Enhanced data cell styling */
+        .officers-table td:nth-child(2) { /* Name column */
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .officers-table td:nth-child(3) { /* Officer ID column */
+            font-family: 'Courier New', monospace;
+            background: #f1f5f9;
+            border-radius: 8px;
+            font-weight: 600;
+            color: #667eea;
+            padding: 8px 12px;
+            margin: 4px 0;
+            display: inline-block;
+            border: 1px solid #e2e8f0;
+        }
+
+        .officers-table td:nth-child(4) { /* Email column */
+            color: #6366f1;
+            font-weight: 500;
+        }
+
+        .officers-table td:nth-child(5), /* Phone column */
+        .officers-table td:nth-child(6) { /* WhatsApp column */
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: #059669;
+        }
+
+        .officers-table td:nth-child(7) { /* District column */
+            font-weight: 600;
+            color: #7c3aed;
+        }
+
+        .officers-table td:nth-child(11) { /* Role column */
+            font-weight: 600;
+            text-transform: capitalize;
+            color: #dc2626;
+        }
+
+        .officers-table tbody tr:last-child td:first-child {
+            border-bottom-left-radius: 16px;
+        }
+
+        .officers-table tbody tr:last-child td:last-child {
+            border-bottom-right-radius: 16px;
+        }
+
+        .officers-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Enhanced loading and empty states */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        .loading-text {
+            color: #6b7280;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            color: #d1d5db;
+            margin-bottom: 20px;
+        }
+
+        .empty-state-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+
+        .empty-state-description {
+            color: #6b7280;
+            font-size: 1rem;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        /* Table header enhancements */
+        .officers-table th {
+            position: relative;
+        }
+
+        .officers-table th::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.3), rgba(255,255,255,0.7), rgba(255,255,255,0.3));
         }
 
         .officer-photo {
-            width: 50px;
-            height: 50px;
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
             object-fit: cover;
-            border: 3px solid var(--white);
-            box-shadow: var(--shadow-md);
-            transition: var(--transition);
+            border: 4px solid white;
+            box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
         }
 
         .officer-photo:hover {
-            transform: scale(1.1);
-            box-shadow: var(--shadow-lg);
+            transform: scale(1.15);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            border-color: #667eea;
+        }
+
+        .officer-photo::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #667eea, #764ba2, #f093fb, #f5576c);
+            border-radius: 50%;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .officer-photo:hover::before {
+            opacity: 1;
         }
 
         .status-badge {
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
+            padding: 10px 18px;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            box-shadow: var(--shadow-sm);
+            letter-spacing: 0.1em;
+            box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .status-badge::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .status-badge:hover::before {
+            left: 100%;
         }
 
         .status-active {
-            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
-            color: #065f46;
-            border: 1px solid #6ee7b7;
+            background: linear-gradient(135deg, #10b981, #34d399);
+            color: white;
+            border: 1px solid #10b981;
+        }
+
+        .status-active:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px -5px rgba(16, 185, 129, 0.4);
         }
 
         .status-inactive {
-            background: linear-gradient(135deg, #fee2e2, #fecaca);
-            color: #991b1b;
-            border: 1px solid #fca5a5;
+            background: linear-gradient(135deg, #ef4444, #f87171);
+            color: white;
+            border: 1px solid #ef4444;
+        }
+
+        .status-inactive:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px -5px rgba(239, 68, 68, 0.4);
         }
 
         .action-buttons {
             display: flex;
-            gap: 10px;
+            gap: 12px;
+            align-items: center;
         }
 
         .action-btn {
-            padding: 8px 16px;
+            padding: 10px 20px;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: var(--transition);
-            box-shadow: var(--shadow-sm);
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            min-width: 80px;
+        }
+
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .action-btn:hover::before {
+            left: 100%;
         }
 
         .edit-btn {
-            background: linear-gradient(135deg, var(--info-color), #60a5fa);
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
             color: white;
+            border: 1px solid #3b82f6;
+        }
+
+        .edit-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4);
+            background: linear-gradient(135deg, #2563eb, #1e40af);
         }
 
         .delete-btn {
-            background: linear-gradient(135deg, var(--danger-color), #f87171);
+            background: linear-gradient(135deg, #ef4444, #dc2626);
             color: white;
+            border: 1px solid #ef4444;
         }
 
-        .action-btn:hover {
+        .delete-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.4);
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+        }
+
+        .action-btn:active {
+            transform: translateY(-1px);
+        }
+
+        /* Action Dropdown Styling */
+        .action-dropdown {
+            position: relative;
+            display: inline-block;
+            z-index: 1000; /* Ensure dropdown container is above other elements */
+        }
+
+        .action-dropdown-btn {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.2);
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            min-width: 100px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .action-dropdown-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .action-dropdown-btn:hover::before {
+            left: 100%;
+        }
+
+        .action-dropdown-btn:hover {
             transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
+            box-shadow: 0 8px 25px -5px rgba(99, 102, 241, 0.4);
+            background: linear-gradient(135deg, #4f46e5, #4338ca);
+        }
+
+        .action-dropdown-arrow {
+            font-size: 0.7rem;
+            transition: transform 0.3s ease;
+        }
+
+        .action-dropdown.active .action-dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .action-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            border: 1px solid #e2e8f0;
+            z-index: 9999; /* Much higher z-index */
+            min-width: 150px;
+            overflow: hidden;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-top: 8px;
+        }
+
+        .action-dropdown.active .action-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .action-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            color: #374151;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .action-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .action-dropdown-item:hover {
+            background: #f8fafc;
+            color: #1f2937;
+            padding-left: 20px;
+        }
+
+        .action-dropdown-item.edit:hover {
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+            color: #2563eb;
+        }
+
+        .action-dropdown-item.delete:hover {
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            color: #dc2626;
+        }
+
+        .action-dropdown-item.track:hover {
+            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+            color: #059669;
+        }
+
+        .action-dropdown-item-icon {
+            font-size: 1rem;
+            width: 18px;
+            text-align: center;
+        }
+
+        /* Fix dropdown positioning for last columns */
+        .officers-table td:last-child .action-dropdown-menu {
+            right: 0;
+            left: auto;
+        }
+
+        .officers-table td:nth-last-child(-n+2) .action-dropdown-menu {
+            right: 0;
+            left: auto;
+        }
+
+        /* Ensure table cells have proper overflow handling */
+        .officers-table td {
+            position: relative;
+            overflow: visible;
+        }
+
+        .officers-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 100; /* Lower than dropdown */
+        }
+
+        /* Ensure action column specifically allows overflow */
+        .officers-table td:last-child {
+            overflow: visible !important;
+            z-index: auto;
+        }
+
+        /* Ensure rows don't interfere with dropdown positioning */
+        .officers-table tbody tr {
+            position: relative;
+            z-index: auto;
+        }
+
+        .officers-table tbody tr.dropdown-active {
+            z-index: 1001; /* Higher when dropdown is active */
+        }
+
+        /* Custom Scrollbar Styling for Table Container (horizontal only) */
+        .officers-table-container::-webkit-scrollbar {
+            width: 0px !important; /* Force remove vertical scrollbar */
+            height: 8px; /* Keep horizontal scrollbar */
+        }
+
+        .officers-table-container::-webkit-scrollbar-vertical {
+            display: none; /* Hide vertical scrollbar completely */
+        }
+
+        .officers-table-container::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+
+        .officers-table-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .officers-table-container::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #5a67d8, #6b46c1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .officers-table-container::-webkit-scrollbar-corner {
+            background: #f1f5f9;
+        }
+
+        /* Custom Scrollbar Styling for Entire Page */
+        body::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        body::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        body::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.5));
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        body::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.6));
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* For Firefox - completely hide vertical scrollbar */
+        .officers-table-container {
+            scrollbar-width: none !important; /* Force remove all scrollbars */
+            scrollbar-color: transparent transparent !important; /* Hide scrollbar colors */
+            scroll-behavior: smooth;
+        }
+
+        /* Override any default scrollbar behavior */
+        .officers-table-container * {
+            scrollbar-width: none !important;
+        }
+
+        /* Additional safeguards to prevent vertical scrollbars */
+        .officers-table-container,
+        .officers-table-container table,
+        .officers-table-container tbody,
+        .officers-table-container thead {
+            overflow-y: hidden !important;
+            max-height: none !important;
+            height: auto !important;
+        }
+
+        /* Firefox scrollbar for entire page */
+        html {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.5) rgba(255, 255, 255, 0.1);
         }
 
         .search-filter {
@@ -857,43 +1358,149 @@
             margin-bottom: 30px;
             flex-wrap: wrap;
             align-items: center;
-            background: var(--light-gray);
-            padding: 25px;
-            border-radius: var(--border-radius);
-            border: 1px solid var(--medium-gray);
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            padding: 30px;
+            border-radius: 20px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .search-filter::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c);
+            border-radius: 20px 20px 0 0;
         }
 
         .search-input {
             flex: 1;
             min-width: 300px;
-            padding: 16px 20px;
-            border: 2px solid var(--medium-gray);
-            border-radius: var(--border-radius);
+            padding: 18px 24px;
+            border: 2px solid #cbd5e1;
+            border-radius: 16px;
             font-size: 1rem;
-            background: var(--white);
-            transition: var(--transition);
+            background: white;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            font-weight: 500;
         }
 
         .search-input:focus {
             outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1), 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .search-input::placeholder {
+            color: #94a3b8;
+            font-weight: 400;
         }
 
         .filter-select {
-            padding: 16px 20px;
-            border: 2px solid var(--medium-gray);
-            border-radius: var(--border-radius);
+            padding: 18px 24px;
+            border: 2px solid #cbd5e1;
+            border-radius: 16px;
             font-size: 1rem;
-            background: var(--white);
-            transition: var(--transition);
+            background: white;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            font-weight: 500;
+            color: #374151;
+            min-width: 180px;
         }
 
         .filter-select:focus {
             outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1), 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .filter-select:hover {
+            border-color: #94a3b8;
+            transform: translateY(-1px);
+        }
+
+        /* Enhanced Refresh Button Styling */
+        .refresh-btn {
+            background: linear-gradient(135deg, #10b981, #059669) !important;
+            color: white !important;
+            border: none !important;
+            padding: 16px 24px !important;
+            border-radius: 12px !important;
+            font-size: 0.95rem !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.2) !important;
+            position: relative !important;
+            overflow: hidden !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.05em !important;
+            min-width: 120px !important;
+            justify-content: center !important;
+        }
+
+        .refresh-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .refresh-btn:hover::before {
+            left: 100%;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-3px) !important;
+            box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4) !important;
+            background: linear-gradient(135deg, #059669, #047857) !important;
+        }
+
+        .refresh-btn:active {
+            transform: translateY(-1px) !important;
+        }
+
+        .refresh-icon {
+            font-size: 1.1rem;
+            animation: none;
+            transition: transform 0.3s ease;
+        }
+
+        .refresh-btn:hover .refresh-icon {
+            animation: refreshSpin 0.6s ease-in-out;
+        }
+
+        @keyframes refreshSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Loading state for refresh button */
+        .refresh-btn.loading {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .refresh-btn.loading .refresh-icon {
+            animation: refreshSpin 1s linear infinite;
         }
 
         .hidden {
@@ -1124,13 +1731,29 @@
             }
 
             /* Mobile-optimized table */
+            .officers-table-container {
+                overflow-x: auto; /* Keep horizontal scroll for table on mobile */
+                overflow-y: hidden !important; /* Force no vertical scroll */
+                box-shadow: none;
+                border-radius: 0;
+                margin-top: 20px;
+            }
+
+            /* Hide any scrollbars on mobile */
+            .officers-table-container::-webkit-scrollbar {
+                width: 0px !important;
+                height: 6px; /* Smaller horizontal scrollbar on mobile */
+            }
+
             .officers-table {
-                font-size: 0.85rem;
+                font-size: 0.9rem;
                 width: 100%;
                 display: block;
-                overflow-x: auto;
-                white-space: nowrap;
-                -webkit-overflow-scrolling: touch;
+                overflow: visible;
+                box-shadow: none;
+                border: none;
+                border-radius: 0;
+                min-width: auto;
             }
 
             .officers-table thead,
@@ -1147,46 +1770,144 @@
                 left: -9999px;
             }
 
-            .officers-table tr {
-                border: 1px solid var(--medium-gray);
-                margin-bottom: 10px;
-                border-radius: 8px;
-                padding: 15px;
-                background: var(--white);
-                box-shadow: var(--shadow-sm);
+            .officers-table tbody tr {
+                border: 2px solid #e2e8f0;
+                margin-bottom: 20px;
+                border-radius: 16px;
+                padding: 20px;
+                background: white;
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                position: relative;
+                overflow: hidden;
+                transform: none;
+            }
+
+            .officers-table tbody tr::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(90deg, #667eea, #764ba2);
+            }
+
+            .officers-table tbody tr:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
             }
 
             .officers-table td {
                 border: none;
                 position: relative;
-                padding: 8px 0 8px 120px;
+                padding: 12px 0 12px 140px;
                 text-align: left;
-                min-height: 30px;
+                min-height: 40px;
                 display: flex;
                 align-items: center;
+                font-size: 0.95rem;
+                margin-bottom: 8px;
             }
 
             .officers-table td:before {
                 content: attr(data-label);
                 position: absolute;
                 left: 0;
-                width: 110px;
+                width: 130px;
                 padding-right: 10px;
                 white-space: nowrap;
-                font-weight: 600;
-                color: var(--text-secondary);
-                font-size: 0.8rem;
+                font-weight: 700;
+                color: #667eea;
+                font-size: 0.85rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
             }
 
-            .action-buttons {
-                justify-content: flex-start;
-                margin-left: 0;
+            .officers-table td:nth-child(3) {
+                background: none;
+                border: none;
+                display: block;
+                padding-left: 140px;
             }
 
-            .action-btn {
-                padding: 6px 12px;
-                font-size: 0.8rem;
-                margin-right: 5px;
+            .action-dropdown {
+                padding-left: 140px;
+                margin-top: 15px;
+                position: relative;
+            }
+
+            .action-dropdown .action-dropdown-menu {
+                position: static;
+                right: auto;
+                left: 0;
+                margin-top: 8px;
+                opacity: 1;
+                visibility: visible;
+                transform: none;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                display: none;
+                z-index: 1000;
+            }
+
+            .action-dropdown.active .action-dropdown-menu {
+                display: block;
+            }
+
+            /* Mobile search and filter styling */
+            .search-filter {
+                flex-direction: column;
+                gap: 15px;
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+
+            .search-input {
+                min-width: 100%;
+                padding: 15px 18px;
+                font-size: 0.95rem;
+            }
+
+            .filter-select {
+                width: 100%;
+                padding: 15px 18px;
+                font-size: 0.95rem;
+            }
+
+            /* Mobile officer photo styling */
+            .officer-photo {
+                width: 50px;
+                height: 50px;
+                border-width: 3px;
+            }
+
+            /* Mobile refresh button styling */
+            .refresh-btn {
+                padding: 12px 20px !important;
+                font-size: 0.9rem !important;
+                min-width: 100px !important;
+            }
+
+            .refresh-icon {
+                font-size: 1rem !important;
+            }
+
+            /* Mobile action dropdown styling */
+            .action-dropdown-btn {
+                padding: 8px 12px !important;
+                font-size: 0.8rem !important;
+                min-width: 90px !important;
+            }
+
+            .action-dropdown-menu {
+                min-width: 130px;
+                right: -10px;
+            }
+
+            .action-dropdown-item {
+                padding: 10px 14px;
+                font-size: 0.85rem;
             }
         }
 
@@ -1493,11 +2214,14 @@
                     <option value="Balasore">Balasore</option>
                     <option value="Sambalpur">Sambalpur</option>
                 </select>
-                <button class="nav-btn" onclick="loadOfficers()">Refresh</button>
+                <button class="refresh-btn nav-btn" onclick="loadOfficers()">
+                    <span class="refresh-icon">🔄</span>
+                    Refresh
+                </button>
             </div>
 
             <div id="loadingOfficers" class="loading">Loading officers...</div>
-            <div id="officersTableContainer">
+            <div id="officersTableContainer" class="officers-table-container">
                 <table class="officers-table" id="officersTable">
                     <thead>
                         <tr>
@@ -1928,6 +2652,7 @@
         // Display officers in table
         function displayOfficers(officers) {
             const tableBody = document.getElementById('officersTableBody');
+            const tableContainer = document.querySelector('.officers-table-container');
             
             if (officers.length === 0) {
                 tableBody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 40px; color: #666;">No officers found</td></tr>';
@@ -1938,8 +2663,9 @@
                 <tr>
                     <td data-label="Photo">
                         ${officer.photoURL ? 
-                            `<img src="${officer.photoURL}" alt="${officer.name}" class="officer-photo" onerror="this.src='data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"50\" height=\"50\" viewBox=\"0 0 24 24\" fill=\"%23ddd\"><path d=\"M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\"/></svg>'">` :
-                            `<div style="width: 50px; height: 50px; border-radius: 50%; background: #ddd; display: flex; align-items: center; justify-content: center; color: #999;">👤</div>`
+                            `<img src="${officer.photoURL}" alt="${officer.name}" class="officer-photo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                             <div style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #e2e8f0, #cbd5e1); display: none; align-items: center; justify-content: center; color: #64748b; font-size: 1.5rem; border: 4px solid white; box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);">👤</div>` :
+                            `<div style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #e2e8f0, #cbd5e1); display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 1.5rem; border: 4px solid white; box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);">👤</div>`
                         }
                     </td>
                     <td data-label="Name">${officer.name}</td>
@@ -1958,9 +2684,25 @@
                         </span>
                     </td>
                     <td data-label="Actions">
-                        <div class="action-buttons">
-                            <button class="action-btn edit-btn" onclick="editOfficer('${officer.docId}')">Edit</button>
-                            <button class="action-btn delete-btn" onclick="deleteOfficer('${officer.docId}', '${officer.name}')">Delete</button>
+                        <div class="action-dropdown" id="actionDropdown-${officer.docId}">
+                            <button class="action-dropdown-btn" onclick="toggleActionDropdown('${officer.docId}')">
+                                Actions
+                                <span class="action-dropdown-arrow">▼</span>
+                            </button>
+                            <div class="action-dropdown-menu">
+                                <button class="action-dropdown-item edit" onclick="editOfficer('${officer.docId}')">
+                                    <span class="action-dropdown-item-icon">✏️</span>
+                                    Edit
+                                </button>
+                                <button class="action-dropdown-item delete" onclick="deleteOfficer('${officer.docId}', '${officer.name}')">
+                                    <span class="action-dropdown-item-icon">🗑️</span>
+                                    Delete
+                                </button>
+                                <button class="action-dropdown-item track" onclick="trackOfficer('${officer.docId}')">
+                                    <span class="action-dropdown-item-icon">📍</span>
+                                    Track
+                                </button>
+                            </div>
                         </div>
                     </td>
                 </tr>
@@ -2008,6 +2750,90 @@
         function editOfficer(docId) {
             alert('Edit functionality coming soon!');
         }
+
+        // Action dropdown functionality
+        function toggleActionDropdown(officerId) {
+            const dropdown = document.getElementById(`actionDropdown-${officerId}`);
+            const allDropdowns = document.querySelectorAll('.action-dropdown');
+            const currentRow = dropdown.closest('tr');
+            
+            // Remove active class from all rows
+            document.querySelectorAll('.officers-table tbody tr').forEach(row => {
+                row.classList.remove('dropdown-active');
+            });
+            
+            // Close all other dropdowns
+            allDropdowns.forEach(dd => {
+                if (dd.id !== `actionDropdown-${officerId}`) {
+                    dd.classList.remove('active');
+                }
+            });
+            
+            // Toggle current dropdown
+            dropdown.classList.toggle('active');
+            
+            // Add active class to current row if dropdown is open
+            if (dropdown.classList.contains('active')) {
+                currentRow.classList.add('dropdown-active');
+                
+                const menu = dropdown.querySelector('.action-dropdown-menu');
+                const rect = dropdown.getBoundingClientRect();
+                const menuRect = menu.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                // Reset positioning
+                menu.style.top = '';
+                menu.style.bottom = '';
+                menu.style.right = '';
+                menu.style.left = '';
+                
+                // Check if dropdown would be cut off at the bottom
+                if (rect.bottom + 150 > viewportHeight) {
+                    menu.style.top = 'auto';
+                    menu.style.bottom = '100%';
+                    menu.style.marginTop = '0';
+                    menu.style.marginBottom = '8px';
+                } else {
+                    menu.style.top = '100%';
+                    menu.style.bottom = 'auto';
+                    menu.style.marginTop = '8px';
+                    menu.style.marginBottom = '0';
+                }
+                
+                // Check if dropdown would be cut off on the right
+                if (rect.right + 150 > viewportWidth - 20) {
+                    menu.style.right = '0';
+                    menu.style.left = 'auto';
+                } else {
+                    menu.style.right = 'auto';
+                    menu.style.left = '0';
+                }
+            }
+        }
+
+        // Track officer function
+        function trackOfficer(docId) {
+            // Close dropdown first
+            document.getElementById(`actionDropdown-${docId}`).classList.remove('active');
+            
+            // Placeholder for tracking functionality
+            alert('Track functionality will show officer location and activities!');
+            // Future implementation: Open tracking modal or redirect to tracking page
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.action-dropdown')) {
+                document.querySelectorAll('.action-dropdown').forEach(dropdown => {
+                    dropdown.classList.remove('active');
+                });
+                // Remove active class from all rows
+                document.querySelectorAll('.officers-table tbody tr').forEach(row => {
+                    row.classList.remove('dropdown-active');
+                });
+            }
+        });
 
         // Navigation functions
         function showCreateOfficer() {
