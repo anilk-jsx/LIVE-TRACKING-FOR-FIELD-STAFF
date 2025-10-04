@@ -1457,80 +1457,24 @@
 
                     <div class="form-group">
                         <label for="district">District <span class="required">*</span></label>
-                        <select id="district" name="district" required onchange="updateBlocks()">
+                        <select id="district" name="district" required>
                             <option value="">Select District</option>
-                            <option value="Bhubaneswar">Bhubaneswar</option>
-                            <option value="Cuttack">Cuttack</option>
-                            <option value="Puri">Puri</option>
-                            <option value="Khordha">Khordha</option>
-                            <option value="Balasore">Balasore</option>
-                            <option value="Sambalpur">Sambalpur</option>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label for="constituency">Constituency <span class="required">*</span></label>
-                        <select id="constituency" name="constituency" required>
-                            <option value="">Select Constituency</option>
-                            <option value="Bhubaneswar North">Bhubaneswar North</option>
-                            <option value="Bhubaneswar Central">Bhubaneswar Central</option>
-                            <option value="Ekamra-Bhubaneswar">Ekamra-Bhubaneswar</option>
-                            <option value="Jatni">Jatni</option>
-                            <option value="Begunia">Begunia</option>
-                            <option value="Khurda">Khurda</option>
-                            <option value="Chilika">Chilika</option>
-                            <option value="Ranpur">Ranpur</option>
-                            <option value="Cuttack-Sadar">Cuttack-Sadar</option>
-                            <option value="Cuttack-Choudwar">Cuttack-Choudwar</option>
-                            <option value="Salepur">Salepur</option>
-                            <option value="Mahanga">Mahanga</option>
-                            <option value="Kantapada">Kantapada</option>
-                            <option value="Niali">Niali</option>
-                            <option value="Paradeep">Paradeep</option>
-                            <option value="Kendrapara">Kendrapara</option>
-                            <option value="Aul">Aul</option>
-                            <option value="Rajnagar">Rajnagar</option>
-                            <option value="Mahakalapada">Mahakalapada</option>
-                            <option value="Kakatpur">Kakatpur</option>
-                            <option value="Nimapada">Nimapada</option>
-                            <option value="Gop">Gop</option>
-                            <option value="Puri">Puri</option>
-                            <option value="Brahmagiri">Brahmagiri</option>
-                            <option value="Satyabadi">Satyabadi</option>
-                            <option value="Pipili">Pipili</option>
-                            <option value="Delanga">Delanga</option>
-                            <option value="Balasore">Balasore</option>
-                            <option value="Remuna">Remuna</option>
-                            <option value="Jaleswar">Jaleswar</option>
-                            <option value="Bhograi">Bhograi</option>
-                            <option value="Basta">Basta</option>
-                            <option value="Baliapal">Baliapal</option>
-                            <option value="Baripada">Baripada</option>
-                            <option value="Udala">Udala</option>
-                            <option value="Rairangpur">Rairangpur</option>
-                            <option value="Bangriposi">Bangriposi</option>
-                            <option value="Karanjia">Karanjia</option>
-                            <option value="Sambalpur">Sambalpur</option>
-                            <option value="Kuchinda">Kuchinda</option>
-                            <option value="Rengali">Rengali</option>
-                            <option value="Brajarajnagar">Brajarajnagar</option>
-                            <option value="Jharsuguda">Jharsuguda</option>
-                            <option value="Deogarh">Deogarh</option>
-                        </select>
+                        <input type="text" id="constituency" name="constituency" required placeholder="Enter constituency name">
                     </div>
 
                     <div class="form-group">
                         <label for="block">Block <span class="required">*</span></label>
-                        <select id="block" name="block" required onchange="updateGpWards()">
-                            <option value="">Select Block</option>
-                        </select>
+                        <input type="text" id="block" name="block" required placeholder="Enter block name">
                     </div>
 
                     <div class="form-group">
                         <label for="gpWard">GP/Ward <span class="required">*</span></label>
-                        <select id="gpWard" name="gpWard" required>
-                            <option value="">Select GP/Ward</option>
-                        </select>
+                        <input type="text" id="gpWard" name="gpWard" required placeholder="Enter GP/Ward name">
                     </div>
 
                     <div class="form-group">
@@ -1629,60 +1573,38 @@
         let officersData = [];
         let filteredOfficersData = [];
 
-        // Administrative data structure
-        const adminData = {
-            "Bhubaneswar": {
-                blocks: ["Bhubaneswar Municipal Corporation", "Jatni", "Khordha"],
-                gpWards: {
-                    "Bhubaneswar Municipal Corporation": ["Ward 1", "Ward 2", "Ward 3", "Ward 4", "Ward 5", "Ward 6", "Ward 7", "Ward 8", "Ward 9", "Ward 10"],
-                    "Jatni": ["Jatni GP", "Kantabada GP", "Balianta GP"],
-                    "Khordha": ["Khordha GP", "Baghamari GP", "Bolagarh GP"]
-                }
-            },
-            "Cuttack": {
-                blocks: ["Cuttack Municipal Corporation", "Salipur", "Tangi-Choudwar"],
-                gpWards: {
-                    "Cuttack Municipal Corporation": ["Ward 1", "Ward 2", "Ward 3", "Ward 4", "Ward 5"],
-                    "Salipur": ["Salipur GP", "Narasinghpur GP"],
-                    "Tangi-Choudwar": ["Tangi GP", "Choudwar GP"]
-                }
-            },
-            "Puri": {
-                blocks: ["Puri Municipality", "Satyabadi", "Gop"],
-                gpWards: {
-                    "Puri Municipality": ["Ward 1", "Ward 2", "Ward 3", "Ward 4"],
-                    "Satyabadi": ["Satyabadi GP", "Brahmagiri GP"],
-                    "Gop": ["Gop GP", "Konark GP"]
-                }
-            },
-            "Khordha": {
-                blocks: ["Khordha Municipality", "Banapur", "Chilika"],
-                gpWards: {
-                    "Khordha Municipality": ["Ward 1", "Ward 2", "Ward 3"],
-                    "Banapur": ["Banapur GP", "Balugaon GP"],
-                    "Chilika": ["Chilika GP", "Rambha GP"]
-                }
-            },
-            "Balasore": {
-                blocks: ["Balasore Municipality", "Soro", "Remuna"],
-                gpWards: {
-                    "Balasore Municipality": ["Ward 1", "Ward 2", "Ward 3"],
-                    "Soro": ["Soro GP", "Angaragadia GP"],
-                    "Remuna": ["Remuna GP", "Astakuanja GP"]
-                }
-            },
-            "Sambalpur": {
-                blocks: ["Sambalpur Municipality", "Kuchinda", "Maneswar"],
-                gpWards: {
-                    "Sambalpur Municipality": ["Ward 1", "Ward 2", "Ward 3"],
-                    "Kuchinda": ["Kuchinda GP", "Dhanupali GP"],
-                    "Maneswar": ["Maneswar GP", "Govindpur GP"]
-                }
-            }
-        };
+        // Static Odisha Districts Data
+        const ODISHA_DISTRICTS = [
+            'Angul', 'Balangir', 'Balasore', 'Bargarh', 'Bhadrak', 'Boudh', 'Cuttack',
+            'Deogarh', 'Dhenkanal', 'Gajapati', 'Ganjam', 'Jagatsinghpur', 'Jajpur',
+            'Jharsuguda', 'Kalahandi', 'Kandhamal', 'Kendrapara', 'Kendujhar',
+            'Khordha', 'Koraput', 'Malkangiri', 'Mayurbhanj', 'Nabarangpur',
+            'Nayagarh', 'Nuapada', 'Puri', 'Rayagada', 'Sambalpur', 'Subarnapur', 'Sundargarh'
+        ];
+
+        // Initialize districts dropdown on page load
+        function initializeDistricts() {
+            const districtSelect = document.getElementById('district');
+            
+            // Clear existing options
+            districtSelect.innerHTML = '<option value="">Select District</option>';
+            
+            // Add all Odisha districts
+            ODISHA_DISTRICTS.forEach(district => {
+                const option = document.createElement('option');
+                option.value = district;
+                option.textContent = district;
+                districtSelect.appendChild(option);
+            });
+        }
+
+        // Note: initializeConstituencies() function removed since constituency is now a text input field
 
         // Initialize Firebase when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
+            // Initialize static district dropdown
+            initializeDistricts();
+            
             // Wait for Firebase to be initialized
             setTimeout(() => {
                 if (window.firebaseAuth) {
@@ -1713,49 +1635,8 @@
             });
         });
 
-        // Update blocks based on selected district
-        function updateBlocks() {
-            const districtSelect = document.getElementById('district');
-            const blockSelect = document.getElementById('block');
-            const gpWardSelect = document.getElementById('gpWard');
-            
-            const selectedDistrict = districtSelect.value;
-            
-            blockSelect.innerHTML = '<option value="">Select Block</option>';
-            gpWardSelect.innerHTML = '<option value="">Select GP/Ward</option>';
-            
-            if (selectedDistrict && adminData[selectedDistrict]) {
-                const blocks = adminData[selectedDistrict].blocks;
-                blocks.forEach(block => {
-                    const option = document.createElement('option');
-                    option.value = block;
-                    option.textContent = block;
-                    blockSelect.appendChild(option);
-                });
-            }
-        }
-
-        // Update GP/Wards based on selected block
-        function updateGpWards() {
-            const districtSelect = document.getElementById('district');
-            const blockSelect = document.getElementById('block');
-            const gpWardSelect = document.getElementById('gpWard');
-            
-            const selectedDistrict = districtSelect.value;
-            const selectedBlock = blockSelect.value;
-            
-            gpWardSelect.innerHTML = '<option value="">Select GP/Ward</option>';
-            
-            if (selectedDistrict && selectedBlock && adminData[selectedDistrict] && adminData[selectedDistrict].gpWards[selectedBlock]) {
-                const gpWards = adminData[selectedDistrict].gpWards[selectedBlock];
-                gpWards.forEach(gpWard => {
-                    const option = document.createElement('option');
-                    option.value = gpWard;
-                    option.textContent = gpWard;
-                    gpWardSelect.appendChild(option);
-                });
-            }
-        }
+        // Note: updateBlocks() and updateGpWards() functions removed since 
+        // constituency, block, and GP/Ward are now text input fields
 
         // Preview uploaded photo
         function previewPhoto(event) {
