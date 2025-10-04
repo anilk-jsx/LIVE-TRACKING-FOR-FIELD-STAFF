@@ -11,11 +11,12 @@
     <!-- Firebase imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
         import { 
             getFirestore, 
             collection, 
             addDoc, 
+            setDoc,
             getDocs, 
             doc, 
             updateDoc, 
@@ -25,12 +26,6 @@
             orderBy, 
             serverTimestamp 
         } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
-        import { 
-            getStorage, 
-            ref, 
-            uploadBytes, 
-            getDownloadURL 
-        } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -46,14 +41,13 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const storage = getStorage(app);
 
         // Make Firebase services available globally
         window.firebaseAuth = auth;
         window.firebaseDB = db;
-        window.firebaseStorage = storage;
         window.collection = collection;
         window.addDoc = addDoc;
+        window.setDoc = setDoc;
         window.getDocs = getDocs;
         window.doc = doc;
         window.updateDoc = updateDoc;
@@ -62,10 +56,8 @@
         window.where = where;
         window.orderBy = orderBy;
         window.serverTimestamp = serverTimestamp;
-        window.ref = ref;
-        window.uploadBytes = uploadBytes;
-        window.getDownloadURL = getDownloadURL;
         window.onAuthStateChanged = onAuthStateChanged;
+        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
     </script>
 
     <style>
@@ -1599,16 +1591,45 @@
             }
         }
 
-        // Upload photo to Firebase Storage
+        // Convert photo to data URL (base64) instead of uploading to Firebase Storage
         async function uploadPhoto(file, officerId) {
             if (!file) return null;
             
             try {
-                const storageRef = window.ref(window.firebaseStorage, `officer-photos/${officerId}-${Date.now()}`);
-                const snapshot = await window.uploadBytes(storageRef, file);
-                const downloadURL = await window.getDownloadURL(snapshot.ref);
-                return downloadURL;
+                // Validate file size (max 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    throw new Error('File size must be less than 5MB');
+                }
+                
+                // Validate file type
+                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+                if (!allowedTypes.includes(file.type)) {
+                    throw new Error('Please upload a valid image file (JPG, PNG, GIF, WebP)');
+                }
+                
+                console.log('Converting image to data URL for officer:', officerId);
+                
+                // Convert file to data URL (base64)
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        const dataURL = e.target.result;
+                        console.log('Image converted to data URL successfully');
+                        resolve(dataURL);
+                    };
+                    
+                    reader.onerror = function(error) {
+                        console.error('Error reading file:', error);
+                        reject(new Error('Failed to process image file'));
+                    };
+                    
+                    // Read file as data URL
+                    reader.readAsDataURL(file);
+                });
+                
             } catch (error) {
+                console.error('Photo processing failed:', error);
                 throw error;
             }
         }
@@ -1654,11 +1675,38 @@
                 if (existingOfficer) {
                     throw new Error('Officer ID already exists. Please use a different ID.');
                 }
+
+                // Check if email already exists in our users collection
+                const existingEmail = await checkEmailExists(officerData.email);
+                if (existingEmail) {
+                    throw new Error('An officer with this email already exists. Please use a different email address.');
+                }
                 
-                // Handle photo upload
+                // Handle photo conversion to data URL
                 const photoFile = document.getElementById('photo').files[0];
+                let photoProcessStatus = 'No photo';
+                
                 if (photoFile) {
-                    officerData.photoURL = await uploadPhoto(photoFile, officerData.id);
+                    try {
+                        console.log('Processing photo file...', photoFile.name);
+                        submitBtn.textContent = 'Processing photo...';
+                        
+                        const photoDataURL = await uploadPhoto(photoFile, officerData.id);
+                        if (photoDataURL) {
+                            officerData.photoURL = photoDataURL;
+                            photoProcessStatus = 'Photo processed successfully';
+                            console.log('Photo converted to data URL successfully');
+                        }
+                        
+                        submitBtn.textContent = 'Creating account...';
+                    } catch (photoError) {
+                        console.error('Photo processing error:', photoError);
+                        photoProcessStatus = `Photo processing failed: ${photoError.message}`;
+                        showMessage('warning', `Photo processing failed: ${photoError.message}. Continuing without photo.`);
+                        // Continue without photo - don't fail the entire process
+                    }
+                } else {
+                    console.log('No photo selected');
                 }
                 
                 // Add metadata
@@ -1666,11 +1714,78 @@
                 officerData.status = 'Active';
                 officerData.createdBy = 'Admin';
                 officerData.updatedAt = window.serverTimestamp();
+                officerData.accountType = 'officer'; // Distinguish from admin accounts
+                officerData.isEmailVerified = false;
+                officerData.lastLogin = null;
                 
-                // Save to Firestore
-                await window.addDoc(window.collection(window.firebaseDB, 'users'), officerData);
+                // Step 1: Create Firebase Auth account with email and password "pwd@123"
+                let userAuthRecord = null;
+                try {
+                    console.log('Creating Firebase Auth account for:', officerData.email);
+                    userAuthRecord = await window.createUserWithEmailAndPassword(
+                        window.firebaseAuth, 
+                        officerData.email, 
+                        'pwd@123'
+                    );
+                    console.log('Firebase Auth account created successfully:', userAuthRecord.user.uid);
+                    
+                    // Add the Firebase Auth UID to officer data
+                    officerData.firebaseUID = userAuthRecord.user.uid;
+                    officerData.defaultPassword = 'pwd@123'; // Store for reference (consider encrypting in production)
+                    
+                } catch (authError) {
+                    console.error('Error creating Firebase Auth account:', authError);
+                    
+                    // Handle specific auth errors
+                    if (authError.code === 'auth/email-already-in-use') {
+                        throw new Error('An account with this email already exists. Please use a different email address.');
+                    } else if (authError.code === 'auth/weak-password') {
+                        throw new Error('Password is too weak. Please choose a stronger password.');
+                    } else if (authError.code === 'auth/invalid-email') {
+                        throw new Error('Invalid email address format.');
+                    } else {
+                        throw new Error(`Error creating login account: ${authError.message}`);
+                    }
+                }
                 
-                showMessage('success', 'Officer created successfully!');
+                // Step 2: Save officer data to Firestore users collection with UID as document ID
+                // Note: Document ID will be the same as Firebase Auth UID for easy lookup
+                try {
+                    console.log('Saving officer data to Firestore users collection with UID:', userAuthRecord.user.uid);
+                    
+                    // Use setDoc with the user's UID as the document ID
+                    const userDocRef = window.doc(window.firebaseDB, 'users', userAuthRecord.user.uid);
+                    await window.setDoc(userDocRef, officerData);
+                    
+                    console.log('Officer data saved successfully with document ID:', userAuthRecord.user.uid);
+                    
+                } catch (firestoreError) {
+                    console.error('Error saving to Firestore:', firestoreError);
+                    
+                    // If Firestore save fails, we should clean up the created auth account
+                    if (userAuthRecord) {
+                        try {
+                            await userAuthRecord.user.delete();
+                            console.log('Cleaned up Firebase Auth account due to Firestore error');
+                        } catch (cleanupError) {
+                            console.error('Error cleaning up auth account:', cleanupError);
+                        }
+                    }
+                    
+                    throw new Error(`Error saving officer data: ${firestoreError.message}`);
+                }
+                
+                showMessage('success', `✅ Officer Account Created Successfully!\n\n📧 Email: ${officerData.email}\n🔑 Password: pwd@123\n📷 Photo: ${photoProcessStatus}\n\nThe officer can now log in using these credentials.`);
+                
+                // Clear the form after successful submission
+                document.getElementById('officerForm').reset();
+                
+                // Clear photo preview
+                const photoPreview = document.getElementById('photoPreview');
+                if (photoPreview) {
+                    photoPreview.style.display = 'none';
+                    photoPreview.src = '';
+                }
                 
                 // Refresh officers list if it's currently shown
                 setTimeout(() => {
@@ -1686,16 +1801,32 @@
             }
         });
 
-        // Check if officer ID already exists
+        // Check if officer ID already exists in users collection
         async function checkOfficerExists(officerId) {
             try {
                 const q = window.query(
-                    window.collection(window.firebaseDB, 'officers'),
+                    window.collection(window.firebaseDB, 'users'),
                     window.where('id', '==', officerId)
                 );
                 const querySnapshot = await window.getDocs(q);
                 return !querySnapshot.empty;
             } catch (error) {
+                console.error('Error checking officer ID:', error);
+                return false;
+            }
+        }
+
+        // Check if email already exists in users collection
+        async function checkEmailExists(email) {
+            try {
+                const q = window.query(
+                    window.collection(window.firebaseDB, 'users'),
+                    window.where('email', '==', email)
+                );
+                const querySnapshot = await window.getDocs(q);
+                return !querySnapshot.empty;
+            } catch (error) {
+                console.error('Error checking email:', error);
                 return false;
             }
         }
@@ -1706,7 +1837,8 @@
                 showLoadingOfficers(true);
                 
                 const q = window.query(
-                    window.collection(window.firebaseDB, 'officers'),
+                    window.collection(window.firebaseDB, 'users'),
+                    window.where('accountType', '==', 'officer'),
                     window.orderBy('createdAt', 'desc')
                 );
                 
