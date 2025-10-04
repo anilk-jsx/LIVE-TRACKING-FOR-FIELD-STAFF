@@ -1101,63 +1101,28 @@
             transform: translateY(-1px);
         }
 
-        /* Action Dropdown Styling */
+        /* Simple, reliable Action Dropdown Styling */
         .action-dropdown {
             position: relative;
             display: inline-block;
-            z-index: 1000; /* Ensure dropdown container is above other elements */
         }
 
         .action-dropdown-btn {
-            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            background: #4f46e5;
             color: white;
             border: none;
-            padding: 10px 16px;
-            border-radius: 12px;
+            padding: 8px 14px;
+            border-radius: 6px;
             font-size: 0.85rem;
-            font-weight: 600;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.2);
-            position: relative;
-            overflow: hidden;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            min-width: 100px;
-            display: inline-flex;
+            display: flex;
             align-items: center;
-            justify-content: center;
             gap: 6px;
         }
 
-        .action-dropdown-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-            transition: left 0.5s;
-        }
-
-        .action-dropdown-btn:hover::before {
-            left: 100%;
-        }
-
         .action-dropdown-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px -5px rgba(99, 102, 241, 0.4);
-            background: linear-gradient(135deg, #4f46e5, #4338ca);
-        }
-
-        .action-dropdown-arrow {
-            font-size: 0.7rem;
-            transition: transform 0.3s ease;
-        }
-
-        .action-dropdown.active .action-dropdown-arrow {
-            transform: rotate(180deg);
+            background: #4338ca;
         }
 
         .action-dropdown-menu {
@@ -1165,33 +1130,71 @@
             top: 100%;
             right: 0;
             background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            border: 1px solid #e2e8f0;
-            z-index: 9999; /* Much higher z-index */
-            min-width: 150px;
-            overflow: hidden;
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(-10px);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            margin-top: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            min-width: 140px;
+            display: none;
+            z-index: 1000;
         }
 
-        .action-dropdown.active .action-dropdown-menu {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
+        .action-dropdown.show .action-dropdown-menu {
+            display: block;
         }
+
+        .action-dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 10px 12px;
+            color: #374151;
+            text-decoration: none;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 0.85rem;
+            text-align: left;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .action-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .action-dropdown-item:hover {
+            background: #f9fafb;
+        }
+
+        .action-dropdown-item.edit:hover {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .action-dropdown-item.delete:hover {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .action-dropdown-item.track:hover {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .action-dropdown-arrow {
+            font-size: 0.7rem;
+        }
+
+        /* Remove complex button animations - keep it simple */
+
+        /* Clean slate for dropdown items */
 
         .action-dropdown-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 12px 16px;
+            gap: 12px;
+            padding: 14px 16px;
             color: #374151;
             text-decoration: none;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             border: none;
             background: none;
             width: 100%;
@@ -1200,6 +1203,9 @@
             font-size: 0.9rem;
             font-weight: 500;
             border-bottom: 1px solid #f1f5f9;
+            /* Prevent any layout issues */
+            box-sizing: border-box;
+            white-space: nowrap;
         }
 
         .action-dropdown-item:last-child {
@@ -1209,7 +1215,6 @@
         .action-dropdown-item:hover {
             background: #f8fafc;
             color: #1f2937;
-            padding-left: 20px;
         }
 
         .action-dropdown-item.edit:hover {
@@ -1253,23 +1258,7 @@
         .officers-table thead th {
             position: sticky;
             top: 0;
-            z-index: 100; /* Lower than dropdown */
-        }
-
-        /* Ensure action column specifically allows overflow */
-        .officers-table td:last-child {
-            overflow: visible !important;
-            z-index: auto;
-        }
-
-        /* Ensure rows don't interfere with dropdown positioning */
-        .officers-table tbody tr {
-            position: relative;
-            z-index: auto;
-        }
-
-        .officers-table tbody tr.dropdown-active {
-            z-index: 1001; /* Higher when dropdown is active */
+            z-index: 100;
         }
 
         /* Custom Scrollbar Styling for Table Container (horizontal only) */
@@ -1903,11 +1892,18 @@
             .action-dropdown-menu {
                 min-width: 130px;
                 right: -10px;
+                /* Ensure mobile dropdowns don't overlap */
+                box-shadow: 0 25px 35px -5px rgba(0, 0, 0, 0.2), 0 15px 15px -5px rgba(0, 0, 0, 0.08);
+                z-index: 999999 !important;
             }
 
             .action-dropdown-item {
-                padding: 10px 14px;
+                padding: 12px 14px; /* Increased padding for better touch targets */
                 font-size: 0.85rem;
+                min-height: 48px; /* Better touch target size */
+                /* Prevent text selection that might interfere with clicks */
+                user-select: none;
+                -webkit-user-select: none;
             }
         }
 
@@ -2340,21 +2336,26 @@
             // Generate and set officer ID when page loads
             generateAndSetOfficerID();
             
+            // Restore the last viewed section before loading data
+            restoreLastViewedSection();
+            
             // Wait for Firebase to be initialized
             setTimeout(() => {
                 if (window.firebaseAuth) {
                     window.onAuthStateChanged(window.firebaseAuth, (user) => {
                         if (user) {
-                            loadOfficers();
+                            // Only load officers if we're on the list section
+                            const currentSection = localStorage.getItem('adminCurrentSection');
+                            if (currentSection === 'list') {
+                                loadOfficers();
+                            }
                         } else {
                             // Redirect to login if not authenticated
-                            window.location.href = 'login.html';
+                            window.location.href = 'index.html';
                         }
                     });
                 }
             }, 1000);
-            
-            document.getElementById('officerName').focus();
 
             // Note: Removed navbar scroll effect as it was targeting non-existent elements
         });
@@ -2501,7 +2502,7 @@
                 // Add metadata
                 officerData.createdAt = window.serverTimestamp();
                 officerData.updatedAt = window.serverTimestamp();
-                officerData.lastLogin = null;
+                officerData.lastindex = null;
                 
                 // Step 1: Create Firebase Auth account with email and password "pwd@123"
                 let userAuthRecord = null;
@@ -2525,7 +2526,7 @@
                     } else if (authError.code === 'auth/invalid-email') {
                         throw new Error('Invalid email address format.');
                     } else {
-                        throw new Error(`Error creating login account: ${authError.message}`);
+                        throw new Error(`Error creating index account: ${authError.message}`);
                     }
                 }
                 
@@ -2684,25 +2685,28 @@
                         </span>
                     </td>
                     <td data-label="Actions">
-                        <div class="action-dropdown" id="actionDropdown-${officer.docId}">
-                            <button class="action-dropdown-btn" onclick="toggleActionDropdown('${officer.docId}')">
-                                Actions
-                                <span class="action-dropdown-arrow">▼</span>
+                        <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                            <button onclick="editOfficer('${officer.docId}')" 
+                                    style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; transition: background 0.2s;"
+                                    onmouseover="this.style.background='#2563eb'" 
+                                    onmouseout="this.style.background='#3b82f6'"
+                                    title="Edit Officer">
+                                ✏️
                             </button>
-                            <div class="action-dropdown-menu">
-                                <button class="action-dropdown-item edit" onclick="editOfficer('${officer.docId}')">
-                                    <span class="action-dropdown-item-icon">✏️</span>
-                                    Edit
-                                </button>
-                                <button class="action-dropdown-item delete" onclick="deleteOfficer('${officer.docId}', '${officer.name}')">
-                                    <span class="action-dropdown-item-icon">🗑️</span>
-                                    Delete
-                                </button>
-                                <button class="action-dropdown-item track" onclick="trackOfficer('${officer.docId}')">
-                                    <span class="action-dropdown-item-icon">📍</span>
-                                    Track
-                                </button>
-                            </div>
+                            <button onclick="deleteOfficer('${officer.docId}', '${officer.name}')" 
+                                    style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; transition: background 0.2s;"
+                                    onmouseover="this.style.background='#dc2626'" 
+                                    onmouseout="this.style.background='#ef4444'"
+                                    title="Delete Officer">
+                                🗑️
+                            </button>
+                            <button onclick="trackOfficer('${officer.docId}')" 
+                                    style="background: #10b981; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; transition: background 0.2s;"
+                                    onmouseover="this.style.background='#059669'" 
+                                    onmouseout="this.style.background='#10b981'"
+                                    title="Track Officer">
+                                📍
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -2751,97 +2755,36 @@
             alert('Edit functionality coming soon!');
         }
 
-        // Action dropdown functionality
-        function toggleActionDropdown(officerId) {
-            const dropdown = document.getElementById(`actionDropdown-${officerId}`);
-            const allDropdowns = document.querySelectorAll('.action-dropdown');
-            const currentRow = dropdown.closest('tr');
-            
-            // Remove active class from all rows
-            document.querySelectorAll('.officers-table tbody tr').forEach(row => {
-                row.classList.remove('dropdown-active');
-            });
-            
-            // Close all other dropdowns
-            allDropdowns.forEach(dd => {
-                if (dd.id !== `actionDropdown-${officerId}`) {
-                    dd.classList.remove('active');
-                }
-            });
-            
-            // Toggle current dropdown
-            dropdown.classList.toggle('active');
-            
-            // Add active class to current row if dropdown is open
-            if (dropdown.classList.contains('active')) {
-                currentRow.classList.add('dropdown-active');
-                
-                const menu = dropdown.querySelector('.action-dropdown-menu');
-                const rect = dropdown.getBoundingClientRect();
-                const menuRect = menu.getBoundingClientRect();
-                const viewportWidth = window.innerWidth;
-                const viewportHeight = window.innerHeight;
-                
-                // Reset positioning
-                menu.style.top = '';
-                menu.style.bottom = '';
-                menu.style.right = '';
-                menu.style.left = '';
-                
-                // Check if dropdown would be cut off at the bottom
-                if (rect.bottom + 150 > viewportHeight) {
-                    menu.style.top = 'auto';
-                    menu.style.bottom = '100%';
-                    menu.style.marginTop = '0';
-                    menu.style.marginBottom = '8px';
-                } else {
-                    menu.style.top = '100%';
-                    menu.style.bottom = 'auto';
-                    menu.style.marginTop = '8px';
-                    menu.style.marginBottom = '0';
-                }
-                
-                // Check if dropdown would be cut off on the right
-                if (rect.right + 150 > viewportWidth - 20) {
-                    menu.style.right = '0';
-                    menu.style.left = 'auto';
-                } else {
-                    menu.style.right = 'auto';
-                    menu.style.left = '0';
-                }
-            }
-        }
-
-        // Track officer function
+        // Track officer function - simplified since no dropdown to close
         function trackOfficer(docId) {
-            // Close dropdown first
-            document.getElementById(`actionDropdown-${docId}`).classList.remove('active');
+            // Find the officer data
+            const officer = officersData.find(o => o.docId === docId);
             
-            // Placeholder for tracking functionality
-            alert('Track functionality will show officer location and activities!');
-            // Future implementation: Open tracking modal or redirect to tracking page
+            if (officer) {
+                // Redirect to track.html with officer information as URL parameters
+                const params = new URLSearchParams({
+                    officerId: officer.officerID || '',
+                    officerName: officer.name || '',
+                    officerEmail: officer.email || ''
+                });
+                
+                window.open(`track.html?${params.toString()}`, '_blank');
+            } else {
+                // Fallback: open track.html without parameters
+                window.open('track.html', '_blank');
+            }
         }
 
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', function(event) {
-            if (!event.target.closest('.action-dropdown')) {
-                document.querySelectorAll('.action-dropdown').forEach(dropdown => {
-                    dropdown.classList.remove('active');
-                });
-                // Remove active class from all rows
-                document.querySelectorAll('.officers-table tbody tr').forEach(row => {
-                    row.classList.remove('dropdown-active');
-                });
-            }
-        });
-
-        // Navigation functions
+        // Navigation functions with state management
         function showCreateOfficer() {
             // Update sidebar active states
             updateSidebarActiveStates(event ? event.target : document.querySelector('.sidebar-nav-item[onclick*="showCreateOfficer"]'));
             
             document.getElementById('createOfficerSection').classList.remove('hidden');
             document.getElementById('officersListSection').classList.add('hidden');
+            
+            // Save current section to localStorage
+            localStorage.setItem('adminCurrentSection', 'create');
             
             // Close sidebar on mobile after selection
             if (window.innerWidth <= 768) {
@@ -2856,6 +2799,9 @@
             document.getElementById('createOfficerSection').classList.add('hidden');
             document.getElementById('officersListSection').classList.remove('hidden');
             
+            // Save current section to localStorage
+            localStorage.setItem('adminCurrentSection', 'list');
+            
             // Close sidebar on mobile after selection
             if (window.innerWidth <= 768) {
                 closeSidebar();
@@ -2863,6 +2809,52 @@
             
             if (officersData.length === 0) {
                 loadOfficers();
+            }
+        }
+
+        // Function to restore the last viewed section
+        function restoreLastViewedSection() {
+            const lastSection = localStorage.getItem('adminCurrentSection');
+            
+            if (lastSection === 'list') {
+                // Show officer list section
+                document.getElementById('createOfficerSection').classList.add('hidden');
+                document.getElementById('officersListSection').classList.remove('hidden');
+                
+                // Update sidebar active states
+                document.querySelectorAll('.sidebar-nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                const listButton = document.querySelector('.sidebar-nav-item[onclick*="showOfficerList"]');
+                if (listButton) {
+                    listButton.classList.add('active');
+                }
+                
+                // Load officers if needed
+                if (officersData.length === 0) {
+                    loadOfficers();
+                }
+            } else {
+                // Default to create officer section
+                document.getElementById('createOfficerSection').classList.remove('hidden');
+                document.getElementById('officersListSection').classList.add('hidden');
+                
+                // Update sidebar active states
+                document.querySelectorAll('.sidebar-nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                const createButton = document.querySelector('.sidebar-nav-item[onclick*="showCreateOfficer"]');
+                if (createButton) {
+                    createButton.classList.add('active');
+                }
+                
+                // Set focus to name field for create section
+                setTimeout(() => {
+                    const nameField = document.getElementById('officerName');
+                    if (nameField) {
+                        nameField.focus();
+                    }
+                }, 100);
             }
         }
 
@@ -2935,18 +2927,18 @@
                         
                         // Redirect to login page after a short delay
                         setTimeout(() => {
-                            window.location.href = 'login.html';
+                            window.location.href = 'index.html';
                         }, 1000);
                     } else {
-                        // Fallback if Firebase auth is not available
-                        window.location.href = 'login.html';
+                        // Fallback if Firebase auth is not available - redirect to login
+                        window.location.href = 'index.html';
                     }
                 } catch (error) {
                     showMessage('error', 'Error during logout. Redirecting...');
                     
-                    // Redirect anyway after error
+                    // Redirect to login anyway after error
                     setTimeout(() => {
-                        window.location.href = 'login.html';
+                        window.location.href = 'index.html';
                     }, 2000);
                 }
             }
