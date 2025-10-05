@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Test</title>
+</head>
+<body>
+    <h1>Debug URL Parameters</h1>
+    <div id="output"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded');
+            console.log('Current URL:', window.location.href);
+            console.log('Search params:', window.location.search);
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const officerId = urlParams.get('officerId');
+            const officerName = urlParams.get('officerName');
+            const officerEmail = urlParams.get('officerEmail');
+            
+            console.log('Parsed parameters:', { officerId, officerName, officerEmail });
+            
+            const output = document.getElementById('output');
+            output.innerHTML = `
+                <p><strong>URL:</strong> ${window.location.href}</p>
+                <p><strong>Search:</strong> ${window.location.search}</p>
+                <p><strong>Officer ID:</strong> ${officerId}</p>
+                <p><strong>Officer Name:</strong> ${decodeURIComponent(officerName || '')}</p>
+                <p><strong>Officer Email:</strong> ${decodeURIComponent(officerEmail || '')}</p>
+            `;
+            
+            if (officerId && officerName) {
+                console.log('URL parameters found - this would trigger admin tracking mode');
+                output.innerHTML += '<p style="color: green;"><strong>✓ Admin tracking mode detected</strong></p>';
+            } else {
+                console.log('No URL parameters - would use session or fallback');
+                output.innerHTML += '<p style="color: orange;"><strong>⚠ No URL parameters - session or fallback mode</strong></p>';
+            }
+        });
+    </script>
+</body>
+</html>

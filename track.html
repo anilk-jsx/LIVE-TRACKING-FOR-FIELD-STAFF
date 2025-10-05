@@ -3,7 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracking for Field Staff</title>  
+    <title>Live Tracking for Field Staff</title>
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+        // Import Firebase functions
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+        import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC3Fm6yUsQd2O-yD3HhccHIvGUAZKiP7u0",
+            authDomain: "trace-the-path.firebaseapp.com",
+            projectId: "trace-the-path",
+            storageBucket: "trace-the-path.firebasestorage.app",
+            messagingSenderId: "818537545903",
+            appId: "1:818537545903:web:50da1e17e4c3b457fed45a",
+            measurementId: "G-5VP540RKTP"
+        };
+
+        // Initialize Firebase with error handling
+        try {
+            console.log('Initializing Firebase for tracking page...');
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+
+            // Make Firebase available globally
+            window.firebaseDB = db;
+            window.firebaseModules = {
+                collection,
+                query,
+                where,
+                getDocs,
+                doc,
+                getDoc
+            };
+            
+            console.log('Firebase initialized successfully for tracking page');
+        } catch (error) {
+            console.error('Firebase initialization error:', error);
+            
+            // Handle OAuth domain errors gracefully
+            if (error.message && error.message.includes('domain') && error.message.includes('authorized')) {
+                console.warn('OAuth Domain Issue - Add', window.location.hostname, 'to Firebase authorized domains');
+                console.log('Tracking will continue with URL parameter data instead of Firebase lookup');
+            }
+        }
+    </script>
+    
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -679,11 +726,11 @@
     <div class="main-container">
         <div class="sidebar">
             <div class="staff-info">
-                <div class="staff-avatar">MK</div>
+                <div class="staff-avatar" id="staffAvatar">MK</div>
                 <div class="staff-details">
-                    <h3>Mahesh Kumar <span class="status-online"></span></h3>
-                    <p>ID 120999 | Booth level officer</p>
-                    <p>Kalyanpur G.P, Bhubaneswar Block</p>
+                    <h3 id="staffName">Loading... <span class="status-online"></span></h3>
+                    <p id="staffIdRole">Loading...</p>
+                    <p id="staffLocation">Loading...</p>
                 </div>
             </div>
             
@@ -711,8 +758,323 @@
     </div>
     
     <script>
+        // Function to load officer profile dynamically
+        async function loadOfficerProfile() {
+            console.log('=== LOADING OFFICER PROFILE ===');
+            
+            // Method 1: Check sessionStorage for tracking data (from admin)
+            const trackingData = sessionStorage.getItem('trackingOfficer');
+            if (trackingData) {
+                try {
+                    const officerData = JSON.parse(trackingData);
+                    console.log('✅ ADMIN TRACKING MODE - Data from sessionStorage:', officerData);
+                    
+                    // Fetch full officer details from Firebase using the officer ID
+                    await fetchOfficerFromFirebase(officerData.officerId, 'admin');
+                    return;
+                } catch (error) {
+                    console.error('Error parsing tracking data from sessionStorage:', error);
+                }
+            }
+            
+            // Method 2: Check URL parameters (fallback for backward compatibility)
+            const urlParams = new URLSearchParams(window.location.search);
+            const officerId = urlParams.get('officerId');
+            const officerName = urlParams.get('officerName');
+            
+            if (officerId) {
+                console.log('✅ URL PARAMETER MODE - Fetching from Firebase:', { officerId, officerName });
+                await fetchOfficerFromFirebase(officerId, 'url_fallback');
+                return;
+            } 
+            
+            // Method 3: Check current user from session (officer login)
+            const currentUser = JSON.parse(sessionStorage.getItem('currentUser') || '{}');
+            if (currentUser.email) {
+                console.log('✅ OFFICER LOGIN MODE - Fetching own profile:', currentUser);
+                
+                // Try to fetch by email first, then by ID
+                await fetchOfficerFromFirebase(currentUser.email, 'self', 'email');
+                return;
+            }
+            
+            console.log('⚠️ FALLBACK MODE - No tracking data found');
+            showFallbackProfile();
+        }
+
+        // Function to fetch officer details from Firebase users collection
+        async function fetchOfficerFromFirebase(identifier, mode, searchBy = 'id') {
+            console.log(`🔍 Fetching officer from Firebase by ${searchBy}:`, identifier);
+            
+            try {
+                if (!window.firebaseDB) {
+                    console.error('Firebase not initialized');
+                    showFallbackProfile();
+                    return;
+                }
+
+                const { collection, query, where, getDocs } = window.firebaseModules;
+                
+                let q;
+                if (searchBy === 'email') {
+                    q = query(collection(window.firebaseDB, 'users'), where('email', '==', identifier));
+                } else {
+                    q = query(collection(window.firebaseDB, 'users'), where('id', '==', identifier));
+                }
+                
+                console.log('🔍 Executing Firebase query...');
+                const querySnapshot = await getDocs(q);
+                
+                if (!querySnapshot.empty) {
+                    const docData = querySnapshot.docs[0].data();
+                    console.log('✅ Officer found in Firebase:', docData);
+                    
+                    const profileData = {
+                        name: docData.name || 'Unknown Officer',
+                        id: docData.id || identifier,
+                        email: docData.email || '',
+                        role: docData.role || 'Field Officer',
+                        phone: docData.phone || '',
+                        district: docData.district || '',
+                        block: docData.block || '',
+                        constituency: docData.constituency || '',
+                        gpWard: docData.gpWard || '',
+                        location: buildLocationString(docData),
+                        trackingMode: mode,
+                        trackingTimestamp: new Date().toISOString(),
+                        photoURL: docData.photoURL || '',
+                        reportingTo: docData.reportingTo || '',
+                        lastLogin: docData.lastLogin || null,
+                        createdAt: docData.createdAt || null,
+                        updatedAt: docData.updatedAt || null
+                    };
+                    
+                    console.log('📋 Complete profile data:', profileData);
+                    updateProfileUI(profileData);
+                } else {
+                    console.log('❌ Officer not found in Firebase, using fallback');
+                    showFallbackProfile();
+                }
+            } catch (error) {
+                console.error('🚨 Error fetching officer from Firebase:', error);
+                showFallbackProfile();
+            }
+        }
+
+        // Function to build location string from officer data
+        function buildLocationString(officerData) {
+            const parts = [];
+            
+            if (officerData.gpWard) parts.push(officerData.gpWard);
+            if (officerData.block) parts.push(officerData.block);
+            if (officerData.constituency) parts.push(officerData.constituency);
+            if (officerData.district) parts.push(officerData.district);
+            
+            return parts.length > 0 ? parts.join(', ') : 'Field Location';
+        }
+
+        // Function to show fallback profile when Firebase data is not available
+        function showFallbackProfile() {
+            const profileData = {
+                name: 'Demo Officer',
+                id: 'DEMO123',
+                email: 'demo@gov.in',
+                role: 'Field Officer',
+                phone: '+91-9876543210',
+                district: 'Khurda',
+                block: 'Bhubaneswar',
+                constituency: 'Demo Constituency',
+                gpWard: 'Demo GP',
+                location: 'Demo Location',
+                trackingMode: 'demo'
+            };
+            
+            console.log('📋 Using fallback profile data:', profileData);
+            updateProfileUI(profileData);
+        }
+        
+        // Function to update profile UI
+        function updateProfileUI(profile) {
+            console.log('=== UPDATING PROFILE UI ===');
+            console.log('Profile data received:', profile);
+            
+            // Wait a bit to ensure DOM is ready
+            setTimeout(() => {
+                // Generate initials for avatar fallback
+                const initials = profile.name.split(' ').map(n => n[0]).join('').toUpperCase();
+                console.log('Generated initials:', initials);
+                
+                // Update UI elements with error checking
+                const staffAvatar = document.getElementById('staffAvatar');
+                const staffName = document.getElementById('staffName');
+                const staffIdRole = document.getElementById('staffIdRole');
+                const staffLocation = document.getElementById('staffLocation');
+                
+                console.log('DOM Elements found:', {
+                    staffAvatar: !!staffAvatar,
+                    staffName: !!staffName,
+                    staffIdRole: !!staffIdRole,
+                    staffLocation: !!staffLocation
+                });
+                
+                if (staffAvatar) {
+                    // Display profile image if available, otherwise show initials
+                    if (profile.photoURL && profile.photoURL.trim() !== '') {
+                        console.log('✅ Profile image found, updating avatar with image');
+                        
+                        // Create an image element to test if the image loads
+                        const testImg = new Image();
+                        testImg.onload = function() {
+                            // Image loaded successfully, apply it to avatar
+                            staffAvatar.style.backgroundImage = `url(${profile.photoURL})`;
+                            staffAvatar.style.backgroundSize = 'cover';
+                            staffAvatar.style.backgroundPosition = 'center';
+                            staffAvatar.style.backgroundRepeat = 'no-repeat';
+                            staffAvatar.textContent = ''; // Clear initials text
+                            staffAvatar.style.color = 'transparent'; // Hide any text
+                            console.log('✅ Profile image loaded and displayed successfully');
+                        };
+                        testImg.onerror = function() {
+                            // Image failed to load, fallback to initials
+                            console.log('⚠️ Profile image failed to load, using initials fallback');
+                            staffAvatar.style.backgroundImage = 'none';
+                            staffAvatar.textContent = initials;
+                            staffAvatar.style.color = 'white';
+                        };
+                        testImg.src = profile.photoURL;
+                    } else {
+                        console.log('⚠️ No profile image found, using initials fallback');
+                        staffAvatar.style.backgroundImage = 'none';
+                        staffAvatar.textContent = initials;
+                        staffAvatar.style.color = 'white'; // Show initials text
+                        console.log('✅ Updated avatar with initials:', initials);
+                    }
+                } else {
+                    console.error('❌ staffAvatar element not found');
+                }
+                
+                if (staffName) {
+                    staffName.innerHTML = `${profile.name} <span class="status-online"></span>`;
+                    console.log('✅ Updated name to:', profile.name);
+                } else {
+                    console.error('❌ staffName element not found');
+                }
+                
+                if (staffIdRole) {
+                    // Show clean role information without reporting details
+                    let roleText = `ID ${profile.id} | ${profile.role}`;
+                    staffIdRole.textContent = roleText;
+                    console.log('✅ Updated ID/Role to:', roleText);
+                } else {
+                    console.error('❌ staffIdRole element not found');
+                }
+                
+                if (staffLocation) {
+                    // Show location without phone number
+                    staffLocation.textContent = profile.location;
+                    console.log('✅ Updated location to:', profile.location);
+                } else {
+                    console.error('❌ staffLocation element not found');
+                }
+                
+                // Update page title based on tracking mode
+                let pageTitle = `Track ${profile.name} - TRACE THE PATH`;
+                if (profile.trackingMode === 'admin') {
+                    pageTitle = `Tracking ${profile.name} - TRACE THE PATH`;
+                } else if (profile.trackingMode === 'self') {
+                    pageTitle = `${profile.name} - TRACE THE PATH`;
+                }
+                document.title = pageTitle;
+                console.log('✅ Updated page title');
+                
+                // Update header subtitle based on tracking mode
+                const headerSubtitle = document.querySelector('.header p');
+                if (headerSubtitle) {
+                    let subtitle = `FOR BOOTH LEVEL OFFICERS`;
+                    if (profile.trackingMode === 'admin') {
+                        subtitle = `Tracking ${profile.name.split(' ')[0]}`;
+                    } else if (profile.trackingMode === 'self') {
+                        subtitle = `FOR BOOTH LEVEL OFFICERS`;
+                    }
+                    headerSubtitle.textContent = subtitle;
+                    console.log('✅ Updated header subtitle');
+                } else {
+                    console.log('⚠️ Header subtitle element not found');
+                }
+                
+                // Add tracking mode indicator
+                addTrackingModeIndicator(profile.trackingMode, profile.trackingTimestamp);
+                
+                console.log('=== PROFILE UPDATE COMPLETED ===');
+                console.log('Final profile info - Name:', profile.name, 'ID:', profile.id, 'Mode:', profile.trackingMode);
+            }, 100); // Small delay to ensure DOM is ready
+        }
+
+        // Function to add tracking mode indicator (disabled for clean UI)
+        function addTrackingModeIndicator(mode, timestamp) {
+            // Remove existing indicator if any
+            const existingIndicator = document.getElementById('trackingModeIndicator');
+            if (existingIndicator) {
+                existingIndicator.remove();
+            }
+            
+            // Tracking mode indicator disabled for production
+            // The function is kept for debugging purposes but doesn't create visible elements
+            console.log('Tracking mode:', mode, 'at', timestamp);
+        }
+
+        // Utility function to clear tracking data
+        function clearTrackingData() {
+            sessionStorage.removeItem('trackingOfficer');
+            console.log('🗑️ Tracking data cleared from sessionStorage');
+            
+            // Show confirmation
+            const indicator = document.getElementById('trackingModeIndicator');
+            if (indicator) {
+                indicator.style.background = '#666';
+                indicator.textContent = '🗑️ Data Cleared';
+                setTimeout(() => {
+                    loadOfficerProfile(); // Reload with fallback data
+                }, 1000);
+            }
+        }
+
+        // Utility function to show tracking info
+        function showTrackingInfo() {
+            const trackingData = sessionStorage.getItem('trackingOfficer');
+            const currentUser = sessionStorage.getItem('currentUser');
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            const info = {
+                'SessionStorage - Tracking Data': trackingData ? JSON.parse(trackingData) : 'None',
+                'SessionStorage - Current User': currentUser ? JSON.parse(currentUser) : 'None',
+                'URL Parameters': {
+                    officerId: urlParams.get('officerId'),
+                    officerName: urlParams.get('officerName'),
+                    officerEmail: urlParams.get('officerEmail')
+                },
+                'Current URL': window.location.href,
+                'Timestamp': new Date().toLocaleString()
+            };
+            
+            console.log('🔍 TRACKING DEBUG INFO:', info);
+            
+            // Show in a popup
+            const infoText = Object.entries(info)
+                .map(([key, value]) => `${key}:\n${typeof value === 'object' ? JSON.stringify(value, null, 2) : value}`)
+                .join('\n\n');
+            
+            alert(`Debug Information:\n\n${infoText}`);
+        }
+
         // Initialize the map when the page loads
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded, current URL:', window.location.href);
+            console.log('URL search params:', window.location.search);
+            
+            // Load officer profile immediately
+            loadOfficerProfile();
+            
             // Create the map (we'll adjust the view after loading data)
             const map = L.map('map').setView([20.2961, 85.8245], 12);
             

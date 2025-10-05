@@ -37,27 +37,39 @@
             appId: "1:818537545903:web:50da1e17e4c3b457fed45a"
         };
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        // Initialize Firebase with error handling
+        try {
+            console.log('Initializing Firebase for admin dashboard...');
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
 
-        // Make Firebase services available globally
-        window.firebaseAuth = auth;
-        window.firebaseDB = db;
-        window.collection = collection;
-        window.addDoc = addDoc;
-        window.setDoc = setDoc;
-        window.getDocs = getDocs;
-        window.doc = doc;
-        window.updateDoc = updateDoc;
-        window.deleteDoc = deleteDoc;
-        window.query = query;
-        window.where = where;
-        window.orderBy = orderBy;
-        window.serverTimestamp = serverTimestamp;
-        window.onAuthStateChanged = onAuthStateChanged;
-        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+            // Make Firebase services available globally
+            window.firebaseAuth = auth;
+            window.firebaseDB = db;
+            window.collection = collection;
+            window.addDoc = addDoc;
+            window.setDoc = setDoc;
+            window.getDocs = getDocs;
+            window.doc = doc;
+            window.updateDoc = updateDoc;
+            window.deleteDoc = deleteDoc;
+            window.query = query;
+            window.where = where;
+            window.orderBy = orderBy;
+            window.serverTimestamp = serverTimestamp;
+            window.onAuthStateChanged = onAuthStateChanged;
+            window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+            
+            console.log('Firebase initialized successfully for admin dashboard');
+        } catch (error) {
+            console.error('Firebase initialization error:', error);
+            
+            // Handle OAuth domain errors gracefully
+            if (error.message && error.message.includes('domain') && error.message.includes('authorized')) {
+                console.warn('OAuth Domain Issue - Add', window.location.hostname, 'to Firebase authorized domains');
+            }
+        }
     </script>
 
     <style>
@@ -2755,23 +2767,35 @@
             alert('Edit functionality coming soon!');
         }
 
-        // Track officer function - simplified since no dropdown to close
+        // Track officer function - using sessionStorage with Firebase lookup
         function trackOfficer(docId) {
+            console.log('Track officer called with docId:', docId);
+            
             // Find the officer data
             const officer = officersData.find(o => o.docId === docId);
+            console.log('Found officer:', officer);
             
             if (officer) {
-                // Redirect to track.html with officer information as URL parameters
-                const params = new URLSearchParams({
-                    officerId: officer.officerID || '',
-                    officerName: officer.name || '',
-                    officerEmail: officer.email || ''
-                });
+                // Store minimal tracking data - the track page will fetch full details from Firebase
+                const trackingData = {
+                    officerId: officer.id || officer.officerID || docId, // Use the actual Firebase document ID
+                    officerName: officer.name || 'Unknown Officer',
+                    officerEmail: officer.email || '',
+                    trackingMode: 'admin',
+                    trackingTimestamp: new Date().toISOString(),
+                    trackedBy: 'admin', // You can get actual admin info from session
+                    firebaseDocId: docId // Keep the Firebase document ID for reference
+                };
                 
-                window.open(`track.html?${params.toString()}`, '_blank');
-            } else {
-                // Fallback: open track.html without parameters
+                // Store in sessionStorage
+                sessionStorage.setItem('trackingOfficer', JSON.stringify(trackingData));
+                console.log('Officer tracking data stored:', trackingData);
+                
+                // Open tracking page - it will fetch full details from Firebase
                 window.open('track.html', '_blank');
+            } else {
+                console.log('Officer not found');
+                alert('Officer data not found. Please try again.');
             }
         }
 

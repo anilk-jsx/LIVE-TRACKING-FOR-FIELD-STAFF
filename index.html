@@ -25,21 +25,52 @@
             measurementId: "G-5VP540RKTP"
         };
 
+        // Check current domain and log info
+        console.log('Current domain:', window.location.hostname);
+        console.log('Current protocol:', window.location.protocol);
+        console.log('Current port:', window.location.port);
+        
+        // Initialize Firebase with error handling
+        try {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
 
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // Make Firebase services available globally
-        window.firebaseAuth = auth;
-        window.firebaseDB = db;
-        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
-        window.onAuthStateChanged = onAuthStateChanged;
-        window.signOut = signOut;
-        window.doc = doc;
-        window.getDoc = getDoc;
+            // Make Firebase services available globally
+            window.firebaseAuth = auth;
+            window.firebaseDB = db;
+            window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+            window.onAuthStateChanged = onAuthStateChanged;
+            window.signOut = signOut;
+            window.doc = doc;
+            window.getDoc = getDoc;
+            
+            console.log('Firebase initialized successfully');
+        } catch (error) {
+            console.error('Firebase initialization error:', error);
+            
+            // Show user-friendly message if OAuth domain error
+            if (error.message && error.message.includes('domain') && error.message.includes('authorized')) {
+                console.warn('OAuth Domain Issue: Please add', window.location.hostname, 'to Firebase authorized domains');
+                
+                // Create a temporary notice for the user
+                setTimeout(() => {
+                    const notice = document.createElement('div');
+                    notice.style.cssText = `
+                        position: fixed; top: 10px; right: 10px; 
+                        background: #ff9800; color: white; padding: 10px; 
+                        border-radius: 5px; z-index: 10000; max-width: 300px;
+                        font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                    `;
+                    notice.innerHTML = `
+                        ⚠️ Domain Authorization Needed<br>
+                        Add <strong>${window.location.hostname}</strong> to Firebase authorized domains.
+                        <button onclick="this.parentElement.remove()" style="margin-left:10px; background: white; color: #ff9800; border: none; padding: 2px 5px; border-radius: 3px; cursor: pointer;">✕</button>
+                    `;
+                    document.body.appendChild(notice);
+                }, 1000);
+            }
+        }
     </script>
     <style>
         * {
