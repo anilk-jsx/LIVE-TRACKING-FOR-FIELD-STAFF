@@ -1469,10 +1469,15 @@
         // Update getUserId function for single user
         function getUserId() {
             // For single user application, return a consistent user ID
-            let userId = localStorage.getItem('singleUserId');
+            // Prefer session-provided user id (set by track.html on login)
+            let userId = sessionStorage.getItem('currentUserId');
 
             if (!userId) {
-                // Generate a consistent user ID for the single user
+                userId = localStorage.getItem('singleUserId');
+            }
+
+            if (!userId) {
+                // Generate a consistent user ID for the single user as a fallback
                 userId = 'user123'; // You can change this to any ID you prefer
                 localStorage.setItem('singleUserId', userId);
             }
@@ -1495,10 +1500,13 @@
                 console.log('Firebase DB available');
                 const { collection, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc } = window.firebaseModules;
 
-                // Generate user ID
+                // Generate or reuse user ID / document id
                 const userId = getUserId();
                 const submissionDate = new Date().toISOString().split('T')[0];
-                const documentId = `${userId}_${submissionDate}`; // Same document for entire day
+
+                // If track.html has created the daily document it stores it in sessionStorage
+                const sessionDocId = sessionStorage.getItem('currentSubmissionDocId');
+                const documentId = sessionDocId || `${userId}_${submissionDate}`; // Prefer session document id
 
                 console.log('User ID:', userId);
                 console.log('Document ID:', documentId);

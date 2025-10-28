@@ -9,7 +9,7 @@
     <script type="module">
         // Import Firebase functions
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-        import { getFirestore, collection, query, where, getDocs, doc, getDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, doc, getDoc, limit, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
         import { getAuth, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 
         // Firebase configuration
@@ -41,6 +41,9 @@
                 doc,
                 getDoc,
                 limit,
+                setDoc,
+                updateDoc,
+                serverTimestamp,
                 updatePassword,
                 reauthenticateWithCredential,
                 EmailAuthProvider
@@ -1037,6 +1040,15 @@
                     
                     console.log('📋 Complete profile data:', profileData);
                     updateProfileUI(profileData);
+
+                    // If this is an officer's own session (not admin viewing), ensure daily doc
+                    try {
+                        if (mode === 'self' || profileData.trackingMode === 'self' || profileData.trackingMode === 'demo') {
+                            await ensureDailySubmissionDocument(profileData.id);
+                        }
+                    } catch (e) {
+                        console.warn('Could not ensure daily document after profile fetch:', e);
+                    }
                 } else {
                     console.log('❌ Officer not found in Firebase, using fallback');
                     showFallbackProfile();
@@ -1194,6 +1206,59 @@
             
             console.log('=== PROFILE UPDATE COMPLETED ===');
             console.log('Final profile info - Name:', profile.name, 'ID:', profile.id, 'Mode:', profile.trackingMode);
+        }
+
+        // Ensure a date-wise submission document exists for the user for today.
+        async function ensureDailySubmissionDocument(userId) {
+            try {
+                if (!window.firebaseDB) {
+                    console.warn('Firebase DB not initialized, skipping daily document creation');
+                    return;
+                }
+
+                const { doc, getDoc, setDoc, serverTimestamp } = window.firebaseModules;
+
+                const submissionDate = new Date().toISOString().split('T')[0];
+                const documentId = `${userId}_${submissionDate}`;
+
+                console.log('Ensuring daily submission document exists for:', documentId);
+
+                const docRef = doc(window.firebaseDB, 'userSubmissions', documentId);
+                const snap = await getDoc(docRef);
+
+                if (snap.exists()) {
+                    console.log('Daily document already exists:', documentId);
+                } else {
+                    const nowIso = new Date().toISOString();
+                    const newDocument = {
+                        documentId: documentId,
+                        userId: userId,
+                        submissionDate: submissionDate,
+                        documentCreated: serverTimestamp(),
+                        lastUpdated: serverTimestamp(),
+                        stats: {
+                            totalPlaces: 0,
+                            totalPhotos: 0,
+                            firstSubmissionTime: null,
+                            lastSubmissionTime: null
+                        },
+                        places: []
+                    };
+
+                    await setDoc(docRef, newDocument);
+                    console.log('Created new daily submission document:', documentId);
+                }
+
+                // Save to session so addPlace.html can reuse it
+                try {
+                    sessionStorage.setItem('currentSubmissionDocId', documentId);
+                    sessionStorage.setItem('currentUserId', userId);
+                } catch (e) {
+                    console.warn('Unable to write submission doc id to sessionStorage:', e);
+                }
+            } catch (error) {
+                console.error('Error ensuring daily submission document:', error);
+            }
         }
 
         // Function to update user menu visibility based on tracking mode
