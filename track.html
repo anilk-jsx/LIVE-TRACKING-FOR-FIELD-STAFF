@@ -4,13 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Tracking for Field Staff</title>
+    <!-- Prevent caching so browser back-button doesn't show protected pages after logout -->
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     
     <!-- Firebase SDKs -->
     <script type="module">
         // Import Firebase functions
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, doc, getDoc, limit, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
-        import { getAuth, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -48,6 +52,9 @@
                 reauthenticateWithCredential,
                 EmailAuthProvider
             };
+            // Expose auth helpers for other scripts
+            window.onAuthStateChanged = onAuthStateChanged;
+            window.signOut = signOut;
             
             console.log('Firebase initialized successfully for tracking page');
         } catch (error) {
@@ -59,6 +66,50 @@
                 console.log('Tracking will continue with URL parameter data instead of Firebase lookup');
             }
         }
+    </script>
+    
+    <script>
+        // Enforce authentication on this page. If the user is not authenticated,
+        // clear client side storage and redirect to `index.html` using replace so
+        // Back button cannot restore the protected page.
+        (function enforceAuthRedirect() {
+            function redirectToLogin() {
+                try { sessionStorage.clear(); } catch (e) {}
+                try { localStorage.clear(); } catch (e) {}
+                try { history.replaceState(null, '', 'index.html'); } catch (e) {}
+                location.replace('index.html');
+            }
+
+            function setupAuthListener() {
+                if (window.onAuthStateChanged && window.firebaseAuth) {
+                    // Listen for auth state changes and redirect when signed out
+                    window.onAuthStateChanged(window.firebaseAuth, (user) => {
+                        if (!user) {
+                            redirectToLogin();
+                        }
+                    });
+                } else {
+                    // Retry until firebase auth is available
+                    setTimeout(setupAuthListener, 200);
+                }
+            }
+
+            // When a page is restored from bfcache (back-forward cache), browsers may
+            // show the previous page snapshot even after logout. Use pageshow to detect
+            // that and verify auth state.
+            window.addEventListener('pageshow', function (event) {
+                if (event.persisted) {
+                    setTimeout(() => {
+                        if (!window.firebaseAuth || !window.firebaseAuth.currentUser) {
+                            redirectToLogin();
+                        }
+                    }, 50);
+                }
+            }, false);
+
+            // Start listening for auth state changes
+            setupAuthListener();
+        })();
     </script>
     
     <!-- Leaflet CSS -->
@@ -1168,22 +1219,45 @@
 
         // Function to show fallback profile when Firebase data is not available
         function showFallbackProfile() {
-            const profileData = {
-                name: 'Demo Officer',
-                id: 'DEMO123',
-                email: 'demo@gov.in',
-                role: 'Field Officer',
-                phone: '+91-9876543210',
-                district: 'Khurda',
-                block: 'Bhubaneswar',
-                constituency: 'Demo Constituency',
-                gpWard: 'Demo GP',
-                location: 'Demo Location',
-                trackingMode: 'demo'
-            };
-            
-            console.log('📋 Using fallback profile data:', profileData);
-            updateProfileUI(profileData);
+                    // Only show demo/fallback profile in two cases:
+                    // 1) The page is explicitly opened in demo mode (URL param ?mode=demo)
+                    // 2) The current user is authenticated but Firebase lookup failed
+                    const urlParams = new URLSearchParams(window.location.search || '');
+                    const explicitDemo = urlParams.get('mode') === 'demo' || urlParams.get('trackingMode') === 'demo';
+
+                    // If Firebase auth is available and there is no signed-in user, do NOT show demo data.
+                    if (window.firebaseAuth && !window.firebaseAuth.currentUser && !explicitDemo) {
+                        console.warn('No authenticated user - not displaying fallback/demo profile. Redirecting to login.');
+                        try { sessionStorage.clear(); } catch (e) {}
+                        try { localStorage.clear(); } catch (e) {}
+                        try { history.replaceState(null, '', 'index.html'); } catch (e) {}
+                        location.replace('index.html');
+                        return;
+                    }
+
+                    // If firebaseAuth is not yet available and not explicit demo, we avoid showing demo UI to
+                    // prevent leaking demo content when the page is reached via Back button after logout.
+                    if (!window.firebaseAuth && !explicitDemo) {
+                        console.warn('Firebase not initialized and not explicit demo - skipping fallback profile to avoid showing demo content.');
+                        return;
+                    }
+
+                    const profileData = {
+                        name: 'Demo Officer',
+                        id: 'DEMO123',
+                        email: 'demo@gov.in',
+                        role: 'Field Officer',
+                        phone: '+91-9876543210',
+                        district: 'Khurda',
+                        block: 'Bhubaneswar',
+                        constituency: 'Demo Constituency',
+                        gpWard: 'Demo GP',
+                        location: 'Demo Location',
+                        trackingMode: 'demo'
+                    };
+
+                    console.log('📋 Using fallback profile data (allowed):', profileData);
+                    updateProfileUI(profileData);
         }
         
         // Function to update profile UI

@@ -7,11 +7,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#6366f1">
     <title>Admin Dashboard - TRACE THE PATH</title>
+    <!-- Prevent caching so browser back-button doesn't show protected pages after logout -->
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     
     <!-- Firebase imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
         import { 
             getFirestore, 
             collection, 
@@ -60,6 +64,8 @@
             window.serverTimestamp = serverTimestamp;
             window.onAuthStateChanged = onAuthStateChanged;
             window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+            // expose signOut so other scripts can call it
+            window.signOut = signOut;
             
             console.log('Firebase initialized successfully for admin dashboard');
         } catch (error) {
@@ -3026,29 +3032,34 @@
             userDropdown.classList.remove('active');
             document.removeEventListener('click', closeDropdownOnClickOutside);
             
-            if (confirm('Are you sure you want to logout?')) {
-                try {
-                    if (window.firebaseAuth && window.signOut) {
-                        await window.signOut(window.firebaseAuth);
+                if (confirm('Are you sure you want to logout?')) {
+                    try {
+                        // Sign out via Firebase if available
+                        if (window.firebaseAuth && window.signOut) {
+                            await window.signOut(window.firebaseAuth);
+                        }
+
+                        // Clear any client side state / caches
+                        try { sessionStorage.clear(); } catch (e) {}
+                        try { localStorage.clear(); } catch (e) {}
+
                         showMessage('success', 'Logged out successfully');
-                        
-                        // Redirect to login page after a short delay
-                        setTimeout(() => {
-                            window.location.href = 'index.html';
-                        }, 1000);
-                    } else {
-                        // Fallback if Firebase auth is not available - redirect to login
-                        window.location.href = 'index.html';
+
+                        // Replace current history entry and navigate to login page so Back won't return here
+                        history.replaceState(null, '', 'index.html');
+                        // Use replace to avoid creating a new history entry
+                        location.replace('index.html');
+                    } catch (error) {
+                        showMessage('error', 'Error during logout. Redirecting...');
+
+                        try { sessionStorage.clear(); } catch (e) {}
+                        try { localStorage.clear(); } catch (e) {}
+
+                        // Still replace/redirect to login
+                        history.replaceState(null, '', 'index.html');
+                        setTimeout(() => location.replace('index.html'), 800);
                     }
-                } catch (error) {
-                    showMessage('error', 'Error during logout. Redirecting...');
-                    
-                    // Redirect to login anyway after error
-                    setTimeout(() => {
-                        window.location.href = 'index.html';
-                    }, 2000);
                 }
-            }
         }
 
         // Utility functions
@@ -3064,6 +3075,49 @@
                 messageElement.style.display = 'none';
             }, 5000);
         }
+
+        // Enforce authentication on this page. If the user is not authenticated,
+        // clear client side storage and redirect to `index.html` using replace so
+        // Back button cannot restore the protected page.
+        (function enforceAuthRedirect() {
+            function redirectToLogin() {
+                try { sessionStorage.clear(); } catch (e) {}
+                try { localStorage.clear(); } catch (e) {}
+                try { history.replaceState(null, '', 'index.html'); } catch (e) {}
+                location.replace('index.html');
+            }
+
+            function setupAuthListener() {
+                if (window.onAuthStateChanged && window.firebaseAuth) {
+                    // Listen for auth state changes and redirect when signed out
+                    window.onAuthStateChanged(window.firebaseAuth, (user) => {
+                        if (!user) {
+                            redirectToLogin();
+                        }
+                    });
+                } else {
+                    // Retry until firebase auth is available
+                    setTimeout(setupAuthListener, 200);
+                }
+            }
+
+            // When a page is restored from bfcache (back-forward cache), browsers may
+            // show the previous page snapshot even after logout. Use pageshow to detect
+            // that and verify auth state.
+            window.addEventListener('pageshow', function (event) {
+                if (event.persisted) {
+                    // If firebaseAuth isn't ready, wait briefly and then check
+                    setTimeout(() => {
+                        if (!window.firebaseAuth || !window.firebaseAuth.currentUser) {
+                            redirectToLogin();
+                        }
+                    }, 50);
+                }
+            }, false);
+
+            // Start listening for auth state changes
+            setupAuthListener();
+        })();
 
         function showLoading(show) {
             document.getElementById('loadingMessage').style.display = show ? 'block' : 'none';
