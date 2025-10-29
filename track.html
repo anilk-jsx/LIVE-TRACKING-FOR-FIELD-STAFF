@@ -1298,6 +1298,22 @@
             
             // Show/hide logout button based on tracking mode
             updateLogoutButtonVisibility(profile.trackingMode);
+
+            // Hide Add Place button when in admin tracking mode to prevent edits
+            try {
+                const addPlaceBtn = document.getElementById('addPlaceBtn');
+                if (addPlaceBtn) {
+                    if (profile.trackingMode === 'admin') {
+                        addPlaceBtn.style.display = 'none';
+                        addPlaceBtn.disabled = true;
+                    } else {
+                        addPlaceBtn.style.display = '';
+                        addPlaceBtn.disabled = false;
+                    }
+                }
+            } catch (e) {
+                console.warn('Could not update addPlace button visibility:', e);
+            }
             
             console.log('=== PROFILE UPDATE COMPLETED ===');
             console.log('Final profile info - Name:', profile.name, 'ID:', profile.id, 'Mode:', profile.trackingMode);
@@ -1673,21 +1689,36 @@
             // Wire up Add Place button (redirects to addPlace.html)
             const addPlaceBtn = document.getElementById('addPlaceBtn');
             if (addPlaceBtn) {
-                addPlaceBtn.addEventListener('click', function () {
-                    // Navigate to addPlace.html in the same tab (user requested same-tab behavior)
-                    try {
-                        addPlaceBtn.style.transform = 'scale(0.95)';
-                        setTimeout(() => addPlaceBtn.style.transform = 'scale(1)', 120);
-                    } catch (e) {}
-                    window.location.href = './addPlace.html';
-                });
+                // If admin opened this page (admin tracking flow), hide/disable Add Place
+                const adminTrackQuickCheck = sessionStorage.getItem('trackingOfficer');
+                if (adminTrackQuickCheck) {
+                    try { addPlaceBtn.style.display = 'none'; } catch (e) {}
+                    try { addPlaceBtn.disabled = true; } catch (e) {}
+                } else {
+                    addPlaceBtn.addEventListener('click', function () {
+                        // Navigate to addPlace.html in the same tab (user requested same-tab behavior)
+                        try {
+                            addPlaceBtn.style.transform = 'scale(0.95)';
+                            setTimeout(() => addPlaceBtn.style.transform = 'scale(1)', 120);
+                        } catch (e) {}
+                        window.location.href = './addPlace.html';
+                    });
+                }
             }
 
-            // After map creation, try to load submission data for the current user/date or fallback to JSON
-                // We'll populate the map with data returned by Firestore documents when available.
-                // NOTE: Do not auto-load demo/fallback JSON on page load. Start with an empty map and
-                // only load data when a user/date is explicitly selected (or when Firestore returns a doc).
+            // After map creation, try to load submission data for the current user/date.
+            // We'll populate the map with data returned by Firestore documents when available.
+            // NOTE: Do not auto-load demo/fallback JSON on page load. Start with an empty map and
+            // only load data when a user/date is explicitly selected (or when Firestore returns a doc).
+            // If this page was opened by the admin (sessionStorage.trackingOfficer present),
+            // defer loading to the admin flow so the admin-selected date is used instead of any
+            // leftover session values.
+            const adminTrack = sessionStorage.getItem('trackingOfficer');
+            if (!adminTrack) {
                 loadInitialSubmissionView();
+            } else {
+                console.log('Admin tracking mode detected; deferring initial load to admin flow');
+            }
         });
 
     // Keep references to markers so we can clear them when switching dates
