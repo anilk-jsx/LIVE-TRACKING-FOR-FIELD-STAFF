@@ -48,6 +48,19 @@
             const auth = getAuth(app);
             const db = getFirestore(app);
 
+            // Workarounds for restrictive networks / proxies which may block
+            // the default WebChannel transport. These settings help avoid
+            // "Could not reach Cloud Firestore backend" timeouts in some
+            // corporate/proxied environments by using long-polling / fetch streams.
+            try {
+                if (db && typeof db.settings === 'function') {
+                    db.settings({ experimentalForceLongPolling: true, useFetchStreams: true });
+                    console.log('Firestore network settings applied: experimentalForceLongPolling & useFetchStreams');
+                }
+            } catch (e) {
+                console.warn('Unable to apply Firestore network settings:', e);
+            }
+
             // Make Firebase services available globally
             window.firebaseAuth = auth;
             window.firebaseDB = db;
@@ -68,6 +81,9 @@
             window.signOut = signOut;
             
             console.log('Firebase initialized successfully for admin dashboard');
+            // Basic online/offline diagnostic logs
+            window.addEventListener('online', () => console.log('Network: online'));
+            window.addEventListener('offline', () => console.warn('Network: offline - Firestore may fail to reach backend'));
         } catch (error) {
             console.error('Firebase initialization error:', error);
             
