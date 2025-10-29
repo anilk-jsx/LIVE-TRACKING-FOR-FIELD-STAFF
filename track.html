@@ -1098,6 +1098,48 @@
                             } catch (innerErr) {
                                 console.warn('Failed to load available dates or submission doc:', innerErr);
                             }
+                        } else if (mode === 'admin' || profileData.trackingMode === 'admin') {
+                            // Admin viewing: populate date selector and honor any selectedDate passed via sessionStorage
+                            try {
+                                await loadAvailableDates(profileData.id);
+                                const selector = document.getElementById('dateSelector');
+
+                                // Check for admin-selected date in sessionStorage
+                                let adminSelectedDate = null;
+                                try {
+                                    const tr = sessionStorage.getItem('trackingOfficer');
+                                    if (tr) {
+                                        const tro = JSON.parse(tr);
+                                        adminSelectedDate = tro.selectedDate || tro.selected_date || null;
+                                    }
+                                } catch (ee) {
+                                    console.warn('Error reading trackingOfficer from sessionStorage:', ee);
+                                }
+
+                                if (selector) {
+                                    if (adminSelectedDate) {
+                                        // If the date isn't already present in options, append it
+                                        let found = false;
+                                        for (let i = 0; i < selector.options.length; i++) {
+                                            if (selector.options[i].value === adminSelectedDate) { found = true; break; }
+                                        }
+                                        if (!found) {
+                                            const opt = document.createElement('option');
+                                            opt.value = adminSelectedDate;
+                                            opt.textContent = adminSelectedDate;
+                                            selector.appendChild(opt);
+                                        }
+                                        selector.value = adminSelectedDate;
+                                    } else if (selector.options.length > 0) {
+                                        selector.value = selector.options[0].value;
+                                    }
+
+                                    // Load the selected date (adminSelectedDate or default)
+                                    if (selector && selector.value) await loadSubmissionByDate(profileData.id, selector.value);
+                                }
+                            } catch (innerErr) {
+                                console.warn('Failed to load available dates for admin view:', innerErr);
+                            }
                         }
                     } catch (e) {
                         console.warn('Could not ensure daily document after profile fetch:', e);

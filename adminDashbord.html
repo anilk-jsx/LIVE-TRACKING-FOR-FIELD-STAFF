@@ -2244,6 +2244,7 @@
                             <th>GP/Ward</th>
                             <th>Role</th>
                             <th>Reporting To</th>
+                            <th>Track</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -2684,7 +2685,7 @@
             const tableContainer = document.querySelector('.officers-table-container');
             
             if (officers.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 40px; color: #666;">No officers found</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="14" style="text-align: center; padding: 40px; color: #666;">No officers found</td></tr>';
                 return;
             }
             
@@ -2707,10 +2708,18 @@
                     <td data-label="GP/Ward">${officer.gpWard}</td>
                     <td data-label="Role">${officer.role}</td>
                     <td data-label="Reporting To">${officer.reportingTo || 'N/A'}</td>
+                    <td data-label="Track">
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <select id="dateSelect-${officer.docId}" class="date-select" style="padding:6px;border-radius:6px;border:1px solid #e2e8f0;font-size:0.8rem;min-width:120px;">
+                                <option value="">Select Date</option>
+                            </select>
+                            <button onclick="(function(dId){ const sel=document.getElementById('dateSelect-'+dId); trackOfficerWithDate(dId, sel?sel.value:''); })('${officer.docId}')"
+                                    style="background:#10b981;color:white;border:none;padding:6px 8px;border-radius:4px;font-size:0.75rem;cursor:pointer;"
+                                    title="Track Selected Date">▶️</button>
+                        </div>
+                    </td>
                     <td data-label="Status">
-                        <span class="status-badge status-active">
-                            Active
-                        </span>
+                        <span class="status-badge status-active">Active</span>
                     </td>
                     <td data-label="Actions">
                         <div style="display: flex; gap: 4px; flex-wrap: wrap;">
@@ -2718,27 +2727,53 @@
                                     style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; transition: background 0.2s;"
                                     onmouseover="this.style.background='#2563eb'" 
                                     onmouseout="this.style.background='#3b82f6'"
-                                    title="Edit Officer">
-                                ✏️
-                            </button>
+                                    title="Edit Officer">✏️</button>
                             <button onclick="deleteOfficer('${officer.docId}', '${officer.name}')" 
                                     style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; transition: background 0.2s;"
                                     onmouseover="this.style.background='#dc2626'" 
                                     onmouseout="this.style.background='#ef4444'"
-                                    title="Delete Officer">
-                                🗑️
-                            </button>
-                            <button onclick="trackOfficer('${officer.docId}')" 
-                                    style="background: #10b981; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; transition: background 0.2s;"
-                                    onmouseover="this.style.background='#059669'" 
-                                    onmouseout="this.style.background='#10b981'"
-                                    title="Track Officer">
-                                📍
-                            </button>
+                                    title="Delete Officer">🗑️</button>
                         </div>
                     </td>
                 </tr>
             `).join('');
+
+            // After rendering rows, populate date selects for each officer
+            officers.forEach(officer => {
+                try {
+                    const selId = `dateSelect-${officer.docId}`;
+                    const sel = document.getElementById(selId);
+                    if (!sel) return;
+
+                    // Determine start date from officer.createdAt (Firestore Timestamp or ISO string)
+                    let startDate = new Date();
+                    if (officer.createdAt) {
+                        if (officer.createdAt.toDate) startDate = officer.createdAt.toDate();
+                        else startDate = new Date(officer.createdAt);
+                    }
+
+                    // If startDate is invalid or in future, fallback to 7 days ago
+                    if (isNaN(startDate.getTime()) || startDate > new Date()) {
+                        startDate = new Date();
+                        startDate.setDate(startDate.getDate() - 7);
+                    }
+
+                    const today = new Date();
+                    // Build options from startDate to today (inclusive), newest first
+                    for (let d = new Date(today); d >= startDate; d.setDate(d.getDate() - 1)) {
+                        const y = d.getFullYear();
+                        const m = String(d.getMonth() + 1).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        const val = `${y}-${m}-${day}`;
+                        const opt = document.createElement('option');
+                        opt.value = val;
+                        opt.textContent = val;
+                        sel.appendChild(opt);
+                    }
+                } catch (e) {
+                    console.warn('Could not populate date select for officer', officer.docId, e);
+                }
+            });
         }
 
         // Filter officers based on search and filters
