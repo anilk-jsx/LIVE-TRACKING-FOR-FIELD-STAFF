@@ -903,9 +903,11 @@
                     <h3 id="staffName">Loading... <span class="status-online"></span></h3>
                     <p id="staffIdRole">Loading...</p>
                     <p id="staffLocation">Loading...</p>
+                    <div id="dateSelectorContainer" style="margin-top:10px;">
+                        <select id="dateSelector" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e1e8ed;font-size:0.95rem;color:#333;"></select>
+                    </div>
                 </div>
             </div>
-            
             <div class="summary-stats">
                 <div class="stat-card">
                     <div class="stat-number" id="total-stops">0</div>
@@ -1084,6 +1086,18 @@
                     try {
                         if (mode === 'self' || profileData.trackingMode === 'self' || profileData.trackingMode === 'demo') {
                             await ensureDailySubmissionDocument(profileData.id);
+
+                            // After ensuring today's doc exists, load available dates and default view
+                            try {
+                                await loadAvailableDates(profileData.id);
+                                const selector = document.getElementById('dateSelector');
+                                if (selector && selector.value) {
+                                    // Load the selected date (defaults to today)
+                                    await loadSubmissionByDate(profileData.id, selector.value);
+                                }
+                            } catch (innerErr) {
+                                console.warn('Failed to load available dates or submission doc:', innerErr);
+                            }
                         }
                     } catch (e) {
                         console.warn('Could not ensure daily document after profile fetch:', e);
@@ -1606,7 +1620,7 @@
             loadOfficerProfile();
             
             // Create the map (we'll adjust the view after loading data)
-            const map = L.map('map').setView([20.2961, 85.8245], 12);
+            window.map = L.map('map').setView([20.2961, 85.8245], 12);
             
             // Add OpenStreetMap tiles
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1614,195 +1628,281 @@
                 maxZoom: 19
             }).addTo(map);
             
-            // Load the JSON data and plot markers
-            fetch('./bhubaneswar_block_data.json')
-                .then(response => response.json())
-                .then(jsonData => {
-                    const data = jsonData.data;
-                    const markers = [];
-                    
-                    // Sort locations by date/time to create proper sequence
-                    const sortedData = data.slice().sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
-                    
-                    // Simple function to create a marker
-                    function createMarker(location, index) {
-                        let longitude = location.longitude;
-                        if (location.id === 1 && longitude === 20.296059) {
-                            longitude = 85.824500;
-                        }
-                        
-                        const lat = location.latitude;
-                        const lng = longitude;
-                        
-                        // Simple marker colors based on sequence
-                        let markerColor = '#3498db';
-                        if (index === 0) markerColor = '#2ecc71'; // Start point
-                        if (index === sortedData.length - 1) markerColor = '#e74c3c'; // End point
-                        
-                        // Create simple marker
-                        const marker = L.marker([lat, lng], {
-                            icon: L.divIcon({
-                                className: 'custom-marker',
-                                html: `
-                                    <div style="
-                                        width: 25px; 
-                                        height: 25px; 
-                                        border-radius: 50%; 
-                                        background: ${markerColor}; 
-                                        border: 3px solid white; 
-                                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                                        display: flex; 
-                                        align-items: center; 
-                                        justify-content: center; 
-                                        font-weight: bold; 
-                                        font-size: 12px;
-                                        color: white;
-                                        cursor: pointer;
-                                    ">${index + 1}</div>
-                                `,
-                                iconSize: [25, 25],
-                                iconAnchor: [12, 12]
-                            })
-                        }).addTo(map);
-                        
-                        // Simple popup content
-                        const dateTime = new Date(location.dateTime).toLocaleString();
-                        const popupContent = `
-                            <div style="max-width: 250px;">
-                                <h4 style="margin: 0 0 10px 0; color: #333;">Stop #${index + 1} - ID: ${location.id}</h4>
-                                <p style="margin: 5px 0;"><strong>Address:</strong><br>${location.addressDetail}</p>
-                                <p style="margin: 5px 0;"><strong>Landmark:</strong> ${location.landmark}</p>
-                                <p style="margin: 5px 0;"><strong>Time:</strong> ${dateTime}</p>
-                                <p style="margin: 5px 0;"><strong>Updated By:</strong> ${location.updatedBy}</p>
-                                <p style="margin: 5px 0;"><strong>Photos:</strong> ${location.photos.length} photo(s)</p>
-                                <p style="margin: 5px 0; color: ${markerColor}; font-weight: bold;">
-                                    ${index === 0 ? '🟢 START' : index === sortedData.length - 1 ? '🔴 END' : '🔵 CHECKPOINT'}
-                                </p>
-                            </div>
-                        `;
-                        
-                        marker.bindPopup(popupContent);
-                        markers.push(marker);
-                        return marker;
-                    }
-                    
-                    // Simple function to create all markers at once
-                    function createAllMarkers() {
-                        console.log('🏗️ Creating all landmark markers...');
-                        
-                        // Create all markers immediately
-                        sortedData.forEach((location, index) => {
-                            createMarker(location, index);
-                        });
-                        
-                        console.log(`✓ Created ${sortedData.length} landmark markers`);
-                        
-                        // Fit map to show all markers
-                        if (markers.length > 0) {
-                            const group = new L.featureGroup(markers);
-                            map.fitBounds(group.getBounds().pad(0.1), {
-                                animate: true,
-                                duration: 1.0
-                            });
-                            console.log('📍 Map fitted to show all landmarks');
-                        }
-                    }
-                    
-                    // Create all markers immediately
-                    createAllMarkers();
-                    
-                    // Populate the timeline sidebar
-                    const timeline = document.getElementById('timeline');
-                    let totalPhotos = 0;
-                    
-                    sortedData.forEach((location, index) => {
-                        totalPhotos += location.photos.length;
-                        
-                        const time = new Date(location.dateTime);
-                        const timeString = time.toLocaleTimeString('en-US', { 
-                            hour: '2-digit', 
-                            minute: '2-digit',
-                            hour12: true 
-                        });
-                        
-                        let markerClass = 'checkpoint';
-                        let statusIcon = '📍';
-                        let statusText = 'Meeting';
-                        
-                        if (index === 0) {
-                            markerClass = 'start';
-                            statusIcon = '🟢';
-                            statusText = 'Sign in';
-                        } else if (index === sortedData.length - 1) {
-                            markerClass = 'end';
-                            statusIcon = '🔴';
-                            statusText = 'Sign out';
-                        }
-                        
-                        const timelineItem = `
-                            <div class="timeline-item">
-                                <div class="timeline-marker ${markerClass}">${index + 1}</div>
-                                <div class="timeline-content">
-                                    <h4>${statusIcon} ${statusText} at ${timeString}</h4>
-                                    <p><strong>${location.landmark}</strong></p>
-                                    <p>${location.addressDetail}</p>
-                                    <p style="color: #3498db;">📸 ${location.photos.length} photo(s) taken</p>
-                                </div>
-                            </div>
-                        `;
-                        
-                        timeline.innerHTML += timelineItem;
-                    });
-                    
-                    // Update summary stats
-                    document.getElementById('total-stops').textContent = sortedData.length;
-                    document.getElementById('total-photos').textContent = totalPhotos;
-                    
-                    // Set up recenter button functionality
-                    const recenterBtn = document.getElementById('recenterBtn');
-                    recenterBtn.addEventListener('click', function() {
-                        // Fit to all markers
-                        if (markers.length > 0) {
-                            const group = new L.featureGroup(markers);
-                            const bounds = group.getBounds().pad(0.1);
-                            map.fitBounds(bounds, {
-                                padding: [20, 20],
-                                duration: 1.0,
-                                easeLinearity: 0.5
-                            });
-                        }
-                        
-                        // Visual feedback
-                        recenterBtn.style.transform = 'scale(0.9)';
-                        setTimeout(() => {
-                            recenterBtn.style.transform = 'scale(1)';
-                        }, 150);
-                        
-                        console.log('📍 Map recentered to show all landmarks');
-                    });
-                    
-                    // Set up add place button functionality
-                    const addPlaceBtn = document.getElementById('addPlaceBtn');
-                    addPlaceBtn.addEventListener('click', function() {
-                        // Visual feedback
+            // Wire up Add Place button (redirects to addPlace.html)
+            const addPlaceBtn = document.getElementById('addPlaceBtn');
+            if (addPlaceBtn) {
+                addPlaceBtn.addEventListener('click', function () {
+                    // small click animation then navigate
+                    try {
                         addPlaceBtn.style.transform = 'scale(0.9)';
                         setTimeout(() => {
                             addPlaceBtn.style.transform = 'scale(1)';
-                            // Redirect to addPlace.html
                             window.location.href = './addPlace.html';
-                        }, 150);
-                        
-                        console.log('Redirecting to Add Place page');
-                    });
-                    console.log(`Loaded ${data.length} field staff locations for display`);
-                })
-                .catch(error => {
-                    console.error('Error loading location data:', error);
-                    // Fallback to default location if JSON fails to load
-                    const defaultMarker = L.marker([20.2961, 85.8245]).addTo(map);
-                    defaultMarker.bindPopup('Default Location - Bhubaneswar').openPopup();
+                        }, 120);
+                    } catch (e) {
+                        // fallback navigation
+                        window.location.href = './addPlace.html';
+                    }
                 });
+            }
+
+            // After map creation, try to load submission data for the current user/date or fallback to JSON
+            // We'll populate the map with data returned by Firestore documents when available.
+            loadInitialSubmissionView();
         });
+
+        // Keep references to markers so we can clear them when switching dates
+        let __markers = [];
+
+        // Load initial view: prefer Firestore document for current user/date, else fallback to JSON
+        async function loadInitialSubmissionView() {
+            try {
+                const userId = sessionStorage.getItem('currentUserId');
+                const sessionDocId = sessionStorage.getItem('currentSubmissionDocId');
+
+                if (userId) {
+                    // Populate available dates and load today's document if possible
+                    await loadAvailableDates(userId);
+                    const selector = document.getElementById('dateSelector');
+                    if (selector && selector.value) {
+                        await loadSubmissionByDate(userId, selector.value);
+                        return;
+                    }
+                }
+
+                // Fallback: load static JSON landmarks
+                await renderFallbackJSONData();
+            } catch (error) {
+                console.warn('Initial submission view failed, falling back to JSON:', error);
+                await renderFallbackJSONData();
+            }
+        }
+
+        // Query Firestore for available submission dates for the user and populate the date selector
+        async function loadAvailableDates(userId) {
+            try {
+                if (!window.firebaseDB) return;
+                const { collection, query, where, getDocs } = window.firebaseModules;
+                const q = query(collection(window.firebaseDB, 'userSubmissions'), where('userId', '==', userId));
+                const snaps = await getDocs(q);
+                const dates = [];
+                snaps.forEach(s => {
+                    const d = s.data();
+                    if (d && d.submissionDate) dates.push(d.submissionDate);
+                });
+
+                // Always include today's date as option
+                const today = new Date().toISOString().split('T')[0];
+                if (!dates.includes(today)) dates.push(today);
+
+                // Sort descending
+                dates.sort((a, b) => b.localeCompare(a));
+
+                const selector = document.getElementById('dateSelector');
+                if (!selector) return;
+                selector.innerHTML = '';
+                dates.forEach(d => {
+                    const opt = document.createElement('option');
+                    opt.value = d;
+                    opt.textContent = d;
+                    selector.appendChild(opt);
+                });
+
+                // When user changes date, load that document
+                selector.onchange = async function() {
+                    const sel = selector.value;
+                    await loadSubmissionByDate(userId, sel);
+                };
+
+                // Default to first option
+                if (selector.options.length > 0) selector.value = selector.options[0].value;
+            } catch (error) {
+                console.warn('Failed to load available dates:', error);
+            }
+        }
+
+        // Load and render submission document for given userId and date (YYYY-MM-DD)
+        async function loadSubmissionByDate(userId, date) {
+            try {
+                if (!window.firebaseDB) {
+                    console.warn('Firebase not initialized');
+                    return await renderFallbackJSONData();
+                }
+                const { doc, getDoc } = window.firebaseModules;
+                const documentId = `${userId}_${date}`;
+                const docRef = doc(window.firebaseDB, 'userSubmissions', documentId);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    sessionStorage.setItem('currentSubmissionDocId', documentId);
+                    sessionStorage.setItem('currentUserId', userId);
+                    renderSubmissionData(data);
+                } else {
+                    console.log('No submission document for', documentId, '— falling back to JSON landmarks');
+                    // Clear current session doc id but keep userId
+                    sessionStorage.removeItem('currentSubmissionDocId');
+                    renderFallbackJSONData();
+                }
+            } catch (error) {
+                console.error('Error loading submission document:', error);
+                renderFallbackJSONData();
+            }
+        }
+
+        // Render submission document data (places array) on map and timeline
+        function renderSubmissionData(docData) {
+            try {
+                // Clear existing markers and timeline
+                clearMapMarkers();
+                const timeline = document.getElementById('timeline');
+                timeline.innerHTML = '';
+
+                const places = docData.places || [];
+                let totalPhotos = 0;
+
+                places.forEach((place, index) => {
+                    totalPhotos += place.photoCount || 0;
+                    const lat = place.location.latitude;
+                    const lng = place.location.longitude;
+                    const marker = createMarkerFromPlace(place, index, places.length);
+                    __markers.push(marker);
+
+                    // Timeline entry
+                    const time = new Date(place.submissionTime.iso || place.submissionTime);
+                    const timeString = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    let markerClass = 'checkpoint';
+                    let statusIcon = '�';
+                    let statusText = 'Meeting';
+                    if (index === 0) { markerClass = 'start'; statusIcon = '🟢'; statusText = 'Sign in'; }
+                    else if (index === places.length - 1) { markerClass = 'end'; statusIcon = '🔴'; statusText = 'Sign out'; }
+
+                    const timelineItem = `
+                        <div class="timeline-item">
+                            <div class="timeline-marker ${markerClass}">${index + 1}</div>
+                            <div class="timeline-content">
+                                <h4>${statusIcon} ${statusText} at ${timeString}</h4>
+                                <p><strong>${place.location.landmark}</strong></p>
+                                <p>${place.location.addressDetail}</p>
+                                <p style="color: #3498db;">📸 ${place.photoCount || 0} photo(s) taken</p>
+                            </div>
+                        </div>
+                    `;
+                    timeline.innerHTML += timelineItem;
+                });
+
+                document.getElementById('total-stops').textContent = places.length;
+                document.getElementById('total-photos').textContent = totalPhotos;
+
+                // Fit map to markers
+                if (__markers.length > 0) {
+                    const group = new L.featureGroup(__markers);
+                    window.map.fitBounds(group.getBounds().pad(0.1));
+                }
+            } catch (error) {
+                console.error('Error rendering submission data:', error);
+            }
+        }
+
+        // Create a marker from a place object and return the marker
+        function createMarkerFromPlace(place, index, total) {
+            const lat = place.location.latitude || 0;
+            const lng = place.location.longitude || 0;
+            let markerColor = '#3498db';
+            if (index === 0) markerColor = '#2ecc71';
+            if (index === total - 1) markerColor = '#e74c3c';
+
+            const marker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="width:25px;height:25px;border-radius:50%;background:${markerColor};border:3px solid white;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;color:white;">${index+1}</div>`,
+                    iconSize: [25, 25],
+                    iconAnchor: [12, 12]
+                })
+            }).addTo(window.map);
+
+            const dateTime = new Date(place.submissionTime.iso || place.submissionTime).toLocaleString();
+            const popupContent = `
+                <div style="max-width:250px;">
+                    <h4 style="margin:0 0 10px 0;color:#333;">Stop #${index+1}</h4>
+                    <p style="margin:5px 0;"><strong>Address:</strong><br>${place.location.addressDetail || ''}</p>
+                    <p style="margin:5px 0;"><strong>Landmark:</strong> ${place.location.landmark || ''}</p>
+                    <p style="margin:5px 0;"><strong>Time:</strong> ${dateTime}</p>
+                    <p style="margin:5px 0; color:${markerColor}; font-weight:bold;">${index===0? '🟢 START' : index===total-1? '🔴 END' : '🔵 CHECKPOINT'}</p>
+                </div>
+            `;
+            marker.bindPopup(popupContent);
+            return marker;
+        }
+
+        function clearMapMarkers() {
+            if (!__markers) return;
+            __markers.forEach(m => {
+                try { window.map.removeLayer(m); } catch (e) {}
+            });
+            __markers = [];
+        }
+
+        // Fallback: render static JSON file locations (existing behaviour)
+        async function renderFallbackJSONData() {
+            try {
+                clearMapMarkers();
+                const resp = await fetch('./bhubaneswar_block_data.json');
+                const jsonData = await resp.json();
+                const data = jsonData.data || [];
+                const sortedData = data.slice().sort((a,b)=> new Date(a.dateTime) - new Date(b.dateTime));
+
+                // create markers and timeline similar to earlier implementation
+                const timeline = document.getElementById('timeline');
+                timeline.innerHTML = '';
+                let totalPhotos = 0;
+                const markers = [];
+                sortedData.forEach((location, index) => {
+                    const lat = location.latitude;
+                    const lng = location.longitude === 20.296059 && location.id === 1 ? 85.824500 : location.longitude;
+                    let markerColor = '#3498db';
+                    if (index === 0) markerColor = '#2ecc71';
+                    if (index === sortedData.length - 1) markerColor = '#e74c3c';
+
+                    const marker = L.marker([lat, lng], {
+                        icon: L.divIcon({
+                            className: 'custom-marker',
+                            html: `<div style="width:25px;height:25px;border-radius:50%;background:${markerColor};border:3px solid white;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;color:white;">${index+1}</div>`,
+                            iconSize: [25,25],
+                            iconAnchor: [12,12]
+                        })
+                    }).addTo(window.map);
+                    markers.push(marker);
+                    __markers.push(marker);
+
+                    totalPhotos += (location.photos && location.photos.length) || 0;
+
+                    const time = new Date(location.dateTime);
+                    const timeString = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const timelineItem = `
+                        <div class="timeline-item">
+                            <div class="timeline-marker checkpoint">${index+1}</div>
+                            <div class="timeline-content">
+                                <h4>📍 Meeting at ${timeString}</h4>
+                                <p><strong>${location.landmark}</strong></p>
+                                <p>${location.addressDetail}</p>
+                                <p style="color: #3498db;">📸 ${(location.photos && location.photos.length) || 0} photo(s) taken</p>
+                            </div>
+                        </div>
+                    `;
+                    timeline.innerHTML += timelineItem;
+                });
+
+                document.getElementById('total-stops').textContent = sortedData.length;
+                document.getElementById('total-photos').textContent = totalPhotos;
+
+                if (markers.length > 0) {
+                    const group = new L.featureGroup(markers);
+                    window.map.fitBounds(group.getBounds().pad(0.1));
+                }
+            } catch (error) {
+                console.error('Error loading fallback JSON data:', error);
+            }
+        }
     </script>
     
     <!-- Leaflet JavaScript -->
