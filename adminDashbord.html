@@ -2710,12 +2710,9 @@
                     <td data-label="Reporting To">${officer.reportingTo || 'N/A'}</td>
                     <td data-label="Track">
                         <div style="display:flex;gap:6px;align-items:center;">
-                            <select id="dateSelect-${officer.docId}" class="date-select" style="padding:6px;border-radius:6px;border:1px solid #e2e8f0;font-size:0.8rem;min-width:120px;">
+                            <select id="dateSelect-${officer.docId}" class="date-select" onchange="trackOfficerWithDate('${officer.docId}', this.value)" style="padding:6px;border-radius:6px;border:1px solid #e2e8f0;font-size:0.8rem;min-width:120px;">
                                 <option value="">Select Date</option>
                             </select>
-                            <button onclick="(function(dId){ const sel=document.getElementById('dateSelect-'+dId); trackOfficerWithDate(dId, sel?sel.value:''); })('${officer.docId}')"
-                                    style="background:#10b981;color:white;border:none;padding:6px 8px;border-radius:4px;font-size:0.75rem;cursor:pointer;"
-                                    title="Track Selected Date">▶️</button>
                         </div>
                     </td>
                     <td data-label="Status">
