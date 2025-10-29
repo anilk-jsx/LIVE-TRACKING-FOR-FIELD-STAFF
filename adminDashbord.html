@@ -2336,6 +2336,22 @@
                 option.textContent = district;
                 districtSelect.appendChild(option);
             });
+
+            // Also populate the district filter on the officers list view (if present)
+            try {
+                const filter = document.getElementById('districtFilter');
+                if (filter) {
+                    filter.innerHTML = '<option value="">All Districts</option>';
+                    ODISHA_DISTRICTS.forEach(district => {
+                        const opt = document.createElement('option');
+                        opt.value = district;
+                        opt.textContent = district;
+                        filter.appendChild(opt);
+                    });
+                }
+            } catch (e) {
+                console.warn('Could not populate districtFilter:', e);
+            }
         }
 
         // Note: initializeConstituencies() function removed since constituency is now a text input field
