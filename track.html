@@ -1651,8 +1651,10 @@
             loadInitialSubmissionView();
         });
 
-        // Keep references to markers so we can clear them when switching dates
-        let __markers = [];
+    // Keep references to markers so we can clear them when switching dates
+    let __markers = [];
+    // Keep reference to the currently drawn route polyline so it can be cleared
+    let __routePolyline = null;
 
         // Load initial view: prefer Firestore document for current user/date, else fallback to JSON
         async function loadInitialSubmissionView() {
@@ -1736,7 +1738,7 @@
                     const data = snap.data();
                     sessionStorage.setItem('currentSubmissionDocId', documentId);
                     sessionStorage.setItem('currentUserId', userId);
-                    renderSubmissionData(data);
+                    await renderSubmissionData(data);
                 } else {
                     console.log('No submission document for', documentId, '— falling back to JSON landmarks');
                     // Clear current session doc id but keep userId
@@ -1750,7 +1752,7 @@
         }
 
         // Render submission document data (places array) on map and timeline
-        function renderSubmissionData(docData) {
+    async function renderSubmissionData(docData) {
             try {
                 // Clear existing markers and timeline
                 clearMapMarkers();
@@ -1794,9 +1796,33 @@
                 document.getElementById('total-photos').textContent = totalPhotos;
 
                 // Fit map to markers
-                if (__markers.length > 0) {
-                    const group = new L.featureGroup(__markers);
-                    window.map.fitBounds(group.getBounds().pad(0.1));
+                // Draw route following roads (using OSRM) when possible, fallback to straight polyline
+                try {
+                    const latlngs = places
+                        .map(p => [p.location.latitude, p.location.longitude])
+                        .filter(coord => coord[0] !== undefined && coord[1] !== undefined && !isNaN(coord[0]) && !isNaN(coord[1]));
+
+                    let routeCoords = latlngs;
+                    if (latlngs.length > 1) {
+                        // Try to build a routed path along roads; falls back to straight lines on failure
+                        try {
+                            routeCoords = await buildRouteAlongRoads(latlngs);
+                        } catch (e) {
+                            console.warn('Routing service failed, falling back to straight lines:', e);
+                            routeCoords = latlngs;
+                        }
+
+                        __routePolyline = L.polyline(routeCoords, { color: '#3388ff', weight: 4, opacity: 0.85 }).addTo(window.map);
+                    }
+
+                    if (__markers.length > 0) {
+                        const groupItems = __markers.slice();
+                        if (__routePolyline) groupItems.push(__routePolyline);
+                        const group = new L.featureGroup(groupItems);
+                        window.map.fitBounds(group.getBounds().pad(0.1));
+                    }
+                } catch (e) {
+                    console.warn('Failed to draw route polyline:', e);
                 }
             } catch (error) {
                 console.error('Error rendering submission data:', error);
@@ -1840,6 +1866,13 @@
                 try { window.map.removeLayer(m); } catch (e) {}
             });
             __markers = [];
+            // remove existing route polyline if any
+            try {
+                if (__routePolyline) {
+                    window.map.removeLayer(__routePolyline);
+                    __routePolyline = null;
+                }
+            } catch (e) {}
         }
 
         // Fallback: render static JSON file locations (existing behaviour)
@@ -1896,12 +1929,83 @@
                 document.getElementById('total-photos').textContent = totalPhotos;
 
                 if (markers.length > 0) {
-                    const group = new L.featureGroup(markers);
+                    // draw route connecting fallback markers using routing service where possible
+                    try {
+                        const latlngs = sortedData.map(loc => {
+                            const lat = loc.latitude;
+                            const lng = loc.longitude === 20.296059 && loc.id === 1 ? 85.824500 : loc.longitude;
+                            return [lat, lng];
+                        }).filter(c => c[0] !== undefined && c[1] !== undefined && !isNaN(c[0]) && !isNaN(c[1]));
+
+                        if (latlngs.length > 1) {
+                            try {
+                                const routeCoords = await buildRouteAlongRoads(latlngs);
+                                __routePolyline = L.polyline(routeCoords, { color: '#3388ff', weight: 4, opacity: 0.85 }).addTo(window.map);
+                            } catch (err) {
+                                // fallback to straight polyline if routing fails
+                                __routePolyline = L.polyline(latlngs, { color: '#3388ff', weight: 4, opacity: 0.85 }).addTo(window.map);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to draw fallback route polyline:', e);
+                    }
+
+                    const group = new L.featureGroup(markers.concat(__routePolyline || []));
                     window.map.fitBounds(group.getBounds().pad(0.1));
                 }
             } catch (error) {
                 console.error('Error loading fallback JSON data:', error);
             }
+        }
+
+        // Build a routed path along roads using OSRM routing service.
+        // Accepts an array of [lat, lng] coordinates and returns an array of [lat, lng]
+        // coordinates following roads. Falls back to input coords on failure.
+        async function buildRouteAlongRoads(latlngs) {
+            if (!latlngs || latlngs.length < 2) return latlngs;
+            // Helper to request OSRM for a set of coordinates (lon,lat pairs joined by ; )
+            const fetchOSRM = async (coordsStr) => {
+                const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('OSRM request failed ' + res.status);
+                const json = await res.json();
+                if (!json.routes || !json.routes.length) throw new Error('No routes in OSRM response');
+                return json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]); // convert [lon,lat] -> [lat,lon]
+            };
+
+            try {
+                // If there are not too many waypoints, request a single route
+                if (latlngs.length <= 10) {
+                    const coordsStr = latlngs.map(c => `${c[1]},${c[0]}`).join(';');
+                    return await fetchOSRM(coordsStr);
+                }
+
+                // For larger lists, build the route piecewise between consecutive points to avoid OSRM limits
+                let full = [];
+                for (let i = 0; i < latlngs.length - 1; i++) {
+                    const a = latlngs[i];
+                    const b = latlngs[i + 1];
+                    const coordsStr = `${a[1]},${a[0]};${b[1]},${b[0]}`;
+                    try {
+                        const seg = await fetchOSRM(coordsStr);
+                        if (seg && seg.length) {
+                            if (full.length) {
+                                // avoid duplicating the connecting point
+                                full = full.concat(seg.slice(1));
+                            } else {
+                                full = full.concat(seg);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('OSRM segment failed for', a, b, e);
+                    }
+                }
+                if (full.length) return full;
+            } catch (e) {
+                console.warn('Routing failed:', e);
+            }
+            // fallback
+            return latlngs;
         }
     </script>
     
