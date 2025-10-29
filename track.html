@@ -966,11 +966,25 @@
             
             // Method 3: Check current user from session (officer login)
             const currentUser = JSON.parse(sessionStorage.getItem('currentUser') || '{}');
-            if (currentUser.email) {
+            if (currentUser && (currentUser.uid || currentUser.email)) {
                 console.log('✅ OFFICER LOGIN MODE - Fetching own profile:', currentUser);
-                
-                // Try to fetch by email first, then by ID
-                await fetchOfficerFromFirebase(currentUser.email, 'self', 'email');
+
+                // Prefer lookup by UID (document id) when available, otherwise fall back to email
+                const searchBy = currentUser.uid ? 'uid' : 'email';
+                const identifier = currentUser.uid ? currentUser.uid : currentUser.email;
+
+                // Try to fetch profile from Firestore (best-effort). The fetch function will
+                // call ensureDailySubmissionDocument(profileData.id) only when the user's
+                // numeric `id` (from the users collection) is found. This ensures the per-day
+                // document is named using the users collection `id` field: `<id>_YYYY-MM-DD`.
+                try {
+                    await fetchOfficerFromFirebase(identifier, 'self', searchBy);
+                } catch (e) {
+                    console.warn('Error fetching profile for current user:', e);
+                    // If profile can't be fetched, do not create a per-day document using UID/email here,
+                    // because the requirement is to use the numeric `id` from the users collection.
+                }
+
                 return;
             }
             
@@ -1000,24 +1014,49 @@
                     return;
                 }
 
-                const { collection, query, where, getDocs, limit } = window.firebaseModules;
-                
-                let q;
-                if (searchBy === 'email') {
-                    // Limit to 1 result for faster query
-                    q = query(collection(window.firebaseDB, 'users'), where('email', '==', identifier), limit(1));
-                } else {
-                    // Limit to 1 result for faster query
-                    q = query(collection(window.firebaseDB, 'users'), where('id', '==', identifier), limit(1));
+                const { collection, query, where, getDocs, limit, doc: docFn, getDoc } = window.firebaseModules;
+
+                let docData = null;
+
+                // If caller requested a UID/document lookup, try direct document read first
+                if (searchBy === 'uid' || searchBy === 'id') {
+                    try {
+                        console.log('🔍 Attempting direct user document lookup by id:', identifier);
+                        const userDocRef = docFn(window.firebaseDB, 'users', identifier);
+                        const userSnap = await getDoc(userDocRef);
+                        if (userSnap.exists()) {
+                            docData = userSnap.data();
+                            console.log('✅ Officer found via document lookup:', docData);
+                        } else {
+                            console.log('🔎 No user document found at users/', identifier);
+                        }
+                    } catch (err) {
+                        console.warn('Direct document lookup failed:', err);
+                    }
                 }
-                
-                console.log('🔍 Executing optimized Firebase query...');
-                const querySnapshot = await getDocs(q);
-                
-                if (!querySnapshot.empty) {
-                    const docData = querySnapshot.docs[0].data();
-                    console.log('✅ Officer found in Firebase:', docData);
-                    
+
+                // If not found by document id, fall back to indexed queries (email or id field)
+                if (!docData) {
+                    try {
+                        let q;
+                        if (searchBy === 'email') {
+                            q = query(collection(window.firebaseDB, 'users'), where('email', '==', identifier), limit(1));
+                        } else {
+                            q = query(collection(window.firebaseDB, 'users'), where('id', '==', identifier), limit(1));
+                        }
+
+                        console.log('🔍 Executing optimized Firebase query...');
+                        const querySnapshot = await getDocs(q);
+                        if (!querySnapshot.empty) {
+                            docData = querySnapshot.docs[0].data();
+                            console.log('✅ Officer found in Firebase via query:', docData);
+                        }
+                    } catch (err) {
+                        console.warn('Query lookup failed:', err);
+                    }
+                }
+
+                if (docData) {
                     const profileData = {
                         name: docData.name || 'Unknown Officer',
                         id: docData.id || identifier,
@@ -1037,7 +1076,7 @@
                         createdAt: docData.createdAt || null,
                         updatedAt: docData.updatedAt || null
                     };
-                    
+
                     console.log('📋 Complete profile data:', profileData);
                     updateProfileUI(profileData);
 
