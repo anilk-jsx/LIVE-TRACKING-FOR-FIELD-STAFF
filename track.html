@@ -1684,8 +1684,10 @@
             }
 
             // After map creation, try to load submission data for the current user/date or fallback to JSON
-            // We'll populate the map with data returned by Firestore documents when available.
-            loadInitialSubmissionView();
+                // We'll populate the map with data returned by Firestore documents when available.
+                // NOTE: Do not auto-load demo/fallback JSON on page load. Start with an empty map and
+                // only load data when a user/date is explicitly selected (or when Firestore returns a doc).
+                loadInitialSubmissionView();
         });
 
     // Keep references to markers so we can clear them when switching dates
@@ -1693,27 +1695,40 @@
     // Keep reference to the currently drawn route polyline so it can be cleared
     let __routePolyline = null;
 
-        // Load initial view: prefer Firestore document for current user/date, else fallback to JSON
+        // Load initial view: prefer Firestore document for current user/date.
+        // Important: do NOT auto-load the demo/fallback JSON here. Start with an empty map.
         async function loadInitialSubmissionView() {
             try {
                 const userId = sessionStorage.getItem('currentUserId');
-                const sessionDocId = sessionStorage.getItem('currentSubmissionDocId');
 
                 if (userId) {
-                    // Populate available dates and load today's document if possible
+                    // Populate available dates but do not force rendering demo data.
                     await loadAvailableDates(userId);
+
                     const selector = document.getElementById('dateSelector');
                     if (selector && selector.value) {
                         await loadSubmissionByDate(userId, selector.value);
-                        return;
+                    } else {
+                        // No date selected yet — ensure map is empty and UI is reset
+                        clearMapMarkers();
+                        document.getElementById('timeline').innerHTML = '';
+                        document.getElementById('total-stops').textContent = '0';
+                        document.getElementById('total-photos').textContent = '0';
+                        // Center map to default view without loading any demo markers
+                        try { window.map.setView([20.2961, 85.8245], 12); } catch (e) {}
                     }
+                } else {
+                    // No logged user — start with empty map (no demo data)
+                    clearMapMarkers();
+                    document.getElementById('timeline').innerHTML = '';
+                    document.getElementById('total-stops').textContent = '0';
+                    document.getElementById('total-photos').textContent = '0';
+                    try { window.map.setView([20.2961, 85.8245], 12); } catch (e) {}
                 }
-
-                // Fallback: load static JSON landmarks
-                await renderFallbackJSONData();
             } catch (error) {
-                console.warn('Initial submission view failed, falling back to JSON:', error);
-                await renderFallbackJSONData();
+                console.warn('Initial submission view setup failed:', error);
+                // Keep the map empty on failure
+                clearMapMarkers();
             }
         }
 
@@ -1894,7 +1909,12 @@
             try {
                 if (!window.firebaseDB) {
                     console.warn('Firebase not initialized');
-                    return await renderFallbackJSONData();
+                    // Keep map empty instead of falling back to demo data
+                    clearMapMarkers();
+                    document.getElementById('timeline').innerHTML = '';
+                    document.getElementById('total-stops').textContent = '0';
+                    document.getElementById('total-photos').textContent = '0';
+                    return;
                 }
                 const { doc, getDoc } = window.firebaseModules;
                 const documentId = `${userId}_${date}`;
@@ -1906,14 +1926,22 @@
                     sessionStorage.setItem('currentUserId', userId);
                     await renderSubmissionData(data);
                 } else {
-                    console.log('No submission document for', documentId, '— falling back to JSON landmarks');
+                    console.log('No submission document for', documentId, '— not loading demo data; showing empty map');
                     // Clear current session doc id but keep userId
                     sessionStorage.removeItem('currentSubmissionDocId');
-                    renderFallbackJSONData();
+                    // Clear UI/map instead of loading fallback JSON
+                    clearMapMarkers();
+                    document.getElementById('timeline').innerHTML = '';
+                    document.getElementById('total-stops').textContent = '0';
+                    document.getElementById('total-photos').textContent = '0';
                 }
             } catch (error) {
                 console.error('Error loading submission document:', error);
-                renderFallbackJSONData();
+                // On error, keep the map empty instead of showing demo data
+                clearMapMarkers();
+                try { document.getElementById('timeline').innerHTML = ''; } catch (e) {}
+                try { document.getElementById('total-stops').textContent = '0'; } catch (e) {}
+                try { document.getElementById('total-photos').textContent = '0'; } catch (e) {}
             }
         }
 

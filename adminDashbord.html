@@ -2850,6 +2850,41 @@
             }
         }
 
+        // Track officer with a specific date selected from the date dropdown
+        function trackOfficerWithDate(docId, date) {
+            console.log('Track officer with date called:', docId, date);
+
+            const officer = officersData.find(o => o.docId === docId);
+            if (!officer) {
+                alert('Officer data not found. Please try again.');
+                return;
+            }
+
+            // Determine selected date; if empty use today's date
+            let selectedDate = (date && String(date).trim()) ? String(date).trim() : new Date().toISOString().split('T')[0];
+
+            const trackingData = {
+                officerId: officer.id || officer.officerID || docId,
+                officerName: officer.name || 'Unknown Officer',
+                officerEmail: officer.email || '',
+                trackingMode: 'admin',
+                trackingTimestamp: new Date().toISOString(),
+                trackedBy: 'admin',
+                firebaseDocId: docId,
+                selectedDate: selectedDate
+            };
+
+            try {
+                sessionStorage.setItem('trackingOfficer', JSON.stringify(trackingData));
+                console.log('Stored trackingOfficer in sessionStorage:', trackingData);
+            } catch (e) {
+                console.warn('Could not write trackingOfficer to sessionStorage:', e);
+            }
+
+            // Navigate to track page in same tab
+            window.location.href = 'track.html';
+        }
+
         // Navigation functions with state management
         function showCreateOfficer() {
             // Update sidebar active states
