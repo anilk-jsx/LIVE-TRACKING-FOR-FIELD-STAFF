@@ -1632,17 +1632,12 @@
             const addPlaceBtn = document.getElementById('addPlaceBtn');
             if (addPlaceBtn) {
                 addPlaceBtn.addEventListener('click', function () {
-                    // small click animation then navigate
+                    // Navigate to addPlace.html in the same tab (user requested same-tab behavior)
                     try {
-                        addPlaceBtn.style.transform = 'scale(0.9)';
-                        setTimeout(() => {
-                            addPlaceBtn.style.transform = 'scale(1)';
-                            window.location.href = './addPlace.html';
-                        }, 120);
-                    } catch (e) {
-                        // fallback navigation
-                        window.location.href = './addPlace.html';
-                    }
+                        addPlaceBtn.style.transform = 'scale(0.95)';
+                        setTimeout(() => addPlaceBtn.style.transform = 'scale(1)', 120);
+                    } catch (e) {}
+                    window.location.href = './addPlace.html';
                 });
             }
 
@@ -1678,6 +1673,135 @@
                 console.warn('Initial submission view failed, falling back to JSON:', error);
                 await renderFallbackJSONData();
             }
+        }
+
+        // Keep current document data in memory so we can append new places without reloading
+        window.__currentDocData = null;
+
+        // Listen for messages from addPlace popup
+        window.addEventListener('message', async function (event) {
+            try {
+                const data = event.data || {};
+                if (!data || data.type !== 'newPlace') return;
+
+                const place = data.place;
+                if (!place || !place.location) return;
+
+                console.log('Received new place from popup:', place);
+
+                // Ensure we have a current doc data object
+                if (!window.__currentDocData) {
+                    window.__currentDocData = { places: [] };
+                }
+
+                const places = window.__currentDocData.places;
+                const prev = places.length > 0 ? places[places.length - 1] : null;
+                const prevCoord = prev ? [prev.location.latitude, prev.location.longitude] : null;
+
+                // Add to memory model
+                places.push(place);
+
+                // Add marker for the new place
+                const newIndex = places.length - 1;
+                const marker = createMarkerFromPlace(place, newIndex, places.length);
+                __markers.push(marker);
+
+                // Update timeline UI (append)
+                const timeline = document.getElementById('timeline');
+                const time = new Date(place.submissionTime.iso || place.submissionTime);
+                const timeString = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const markerClass = newIndex === 0 ? 'start' : newIndex === places.length - 1 ? 'end' : 'checkpoint';
+                const statusIcon = newIndex === 0 ? '🟢' : newIndex === places.length - 1 ? '🔴' : '🔵';
+                const statusText = newIndex === 0 ? 'Sign in' : newIndex === places.length - 1 ? 'Sign out' : 'Meeting';
+                const timelineItem = `
+                    <div class="timeline-item">
+                        <div class="timeline-marker ${markerClass}">${newIndex + 1}</div>
+                        <div class="timeline-content">
+                            <h4>${statusIcon} ${statusText} at ${timeString}</h4>
+                            <p><strong>${place.location.landmark}</strong></p>
+                            <p>${place.location.addressDetail}</p>
+                            <p style="color: #3498db;">📸 ${place.photoCount || 0} photo(s) taken</p>
+                        </div>
+                    </div>
+                `;
+                timeline.innerHTML += timelineItem;
+
+                // Update stats
+                const totalStopsEl = document.getElementById('total-stops');
+                const totalPhotosEl = document.getElementById('total-photos');
+                totalStopsEl.textContent = places.length;
+                const currentPhotos = parseInt(totalPhotosEl.textContent || '0', 10) + (place.photoCount || 0);
+                totalPhotosEl.textContent = currentPhotos;
+
+                // Animate route extension from previous to new place
+                if (prevCoord) {
+                    try {
+                        const seg = await buildRouteAlongRoads([prevCoord, [place.location.latitude, place.location.longitude]]);
+
+                        // combine with existing polyline coords
+                        let existing = [];
+                        if (__routePolyline) existing = __routePolyline.getLatLngs().map(ll => [ll.lat, ll.lng]);
+
+                        // avoid duplicate point at junction
+                        let toConcat = seg;
+                        if (existing.length && seg.length && existing[existing.length - 1] && seg[0] && existing[existing.length - 1][0] === seg[0][0] && existing[existing.length - 1][1] === seg[0][1]) {
+                            toConcat = seg.slice(1);
+                        }
+
+                        const newCoords = existing.concat(toConcat);
+                        if (__routePolyline) try { window.map.removeLayer(__routePolyline); } catch (e) {}
+                        __routePolyline = L.polyline(newCoords, { color: '#3388ff', weight: 4, opacity: 0.85 }).addTo(window.map);
+
+                        // Animate marker along toConcat
+                        animateMarkerAlongCoordinates(prevCoord, toConcat);
+                    } catch (e) {
+                        console.warn('Route extension failed, adding straight segment:', e);
+                        // fallback straight add
+                        if (__routePolyline) {
+                            __routePolyline.addLatLng([place.location.latitude, place.location.longitude]);
+                        } else {
+                            __routePolyline = L.polyline([[prevCoord[0], prevCoord[1]], [place.location.latitude, place.location.longitude]], { color: '#3388ff', weight: 4, opacity: 0.85 }).addTo(window.map);
+                        }
+                        animateMarkerAlongCoordinates(prevCoord, [[place.location.latitude, place.location.longitude]]);
+                    }
+                } else {
+                    // No previous point, just fit to marker
+                    if (__routePolyline) {
+                        const groupItems = __markers.slice();
+                        groupItems.push(__routePolyline);
+                        const group = new L.featureGroup(groupItems);
+                        window.map.fitBounds(group.getBounds().pad(0.1));
+                    } else {
+                        window.map.setView([place.location.latitude, place.location.longitude], 16);
+                    }
+                }
+
+            } catch (err) {
+                console.error('Error handling new place message:', err);
+            }
+        });
+
+        // Animate a temporary marker along a series of coords (array of [lat,lng]) starting from startCoord
+        function animateMarkerAlongCoordinates(startCoord, coords) {
+            if (!coords || coords.length === 0) return;
+            const movingMarker = L.marker([startCoord[0], startCoord[1]], { opacity: 0.9 }).addTo(window.map);
+            let i = 0;
+            const step = 100; // ms per step
+            const interval = setInterval(() => {
+                if (i >= coords.length) {
+                    clearInterval(interval);
+                    movingMarker.remove();
+                    // focus map to include new marker/polyline
+                    const groupItems = __markers.slice();
+                    if (__routePolyline) groupItems.push(__routePolyline);
+                    const group = new L.featureGroup(groupItems);
+                    window.map.fitBounds(group.getBounds().pad(0.1));
+                    return;
+                }
+                const p = coords[i];
+                movingMarker.setLatLng([p[0], p[1]]);
+                i++;
+            }, step);
         }
 
         // Query Firestore for available submission dates for the user and populate the date selector
