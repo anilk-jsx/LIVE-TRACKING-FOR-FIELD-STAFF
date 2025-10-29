@@ -1126,12 +1126,27 @@
                         photoURL: docData.photoURL || '',
                         reportingTo: docData.reportingTo || '',
                         lastLogin: docData.lastLogin || null,
-                        createdAt: docData.createdAt || null,
+                        // Normalize createdAt to ISO string where possible for consistent handling
+                        createdAt: (function(raw) {
+                            try {
+                                if (!raw) return null;
+                                if (raw.toDate) return raw.toDate().toISOString();
+                                if (typeof raw === 'string') return raw;
+                                return new Date(raw).toISOString();
+                            } catch (e) { return null; }
+                        })(docData.createdAt),
                         updatedAt: docData.updatedAt || null
                     };
 
                     console.log('📋 Complete profile data:', profileData);
                     updateProfileUI(profileData);
+                    // Persist current user id and createdAt for other flows
+                    try {
+                        if (profileData.id) sessionStorage.setItem('currentUserId', profileData.id);
+                        if (profileData.createdAt) sessionStorage.setItem('currentUserCreatedAt', profileData.createdAt);
+                    } catch (e) {
+                        console.warn('Unable to persist current user info to sessionStorage:', e);
+                    }
 
                     // If this is an officer's own session (not admin viewing), ensure daily doc
                     try {
@@ -1140,7 +1155,7 @@
 
                             // After ensuring today's doc exists, load available dates and default view
                             try {
-                                await loadAvailableDates(profileData.id);
+                                await loadAvailableDates(profileData.id, profileData.createdAt);
                                 const selector = document.getElementById('dateSelector');
                                 if (selector && selector.value) {
                                     // Load the selected date (defaults to today)
@@ -1152,7 +1167,7 @@
                         } else if (mode === 'admin' || profileData.trackingMode === 'admin') {
                             // Admin viewing: populate date selector and honor any selectedDate passed via sessionStorage
                             try {
-                                await loadAvailableDates(profileData.id);
+                                await loadAvailableDates(profileData.id, profileData.createdAt);
                                 const selector = document.getElementById('dateSelector');
 
                                 // Check for admin-selected date in sessionStorage
@@ -1808,7 +1823,8 @@
 
                 if (userId) {
                     // Populate available dates but do not force rendering demo data.
-                    await loadAvailableDates(userId);
+                    const createdAtIso = sessionStorage.getItem('currentUserCreatedAt') || null;
+                    await loadAvailableDates(userId, createdAtIso);
 
                     const selector = document.getElementById('dateSelector');
                     if (selector && selector.value) {
@@ -1967,27 +1983,71 @@
         }
 
         // Query Firestore for available submission dates for the user and populate the date selector
-        async function loadAvailableDates(userId) {
+        async function loadAvailableDates(userId, createdAtIso) {
             try {
-                if (!window.firebaseDB) return;
-                const { collection, query, where, getDocs } = window.firebaseModules;
-                const q = query(collection(window.firebaseDB, 'userSubmissions'), where('userId', '==', userId));
-                const snaps = await getDocs(q);
-                const dates = [];
-                snaps.forEach(s => {
-                    const d = s.data();
-                    if (d && d.submissionDate) dates.push(d.submissionDate);
-                });
-
-                // Always include today's date as option
-                const today = new Date().toISOString().split('T')[0];
-                if (!dates.includes(today)) dates.push(today);
-
-                // Sort descending
-                dates.sort((a, b) => b.localeCompare(a));
-
+                // If createdAtIso is provided, use it to build the full date range from
+                // creation date up to today. Otherwise fall back to available submission
+                // documents to determine earliest date, or 30 days ago as last resort.
                 const selector = document.getElementById('dateSelector');
                 if (!selector) return;
+
+                // Format a Date object to local YYYY-MM-DD (avoid UTC conversion which can shift the day)
+                function toIsoDate(d) {
+                    const dt = new Date(d);
+                    const yyyy = dt.getFullYear();
+                    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                    const dd = String(dt.getDate()).padStart(2, '0');
+                    return `${yyyy}-${mm}-${dd}`;
+                }
+
+                let startDate = null;
+                if (createdAtIso) {
+                    const parsed = new Date(createdAtIso);
+                    if (!isNaN(parsed)) startDate = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+                }
+
+                // If we don't have createdAt, try to determine earliest submission date from Firestore
+                if (!startDate && window.firebaseDB) {
+                    try {
+                        const { collection, query, where, getDocs } = window.firebaseModules;
+                        const q = query(collection(window.firebaseDB, 'userSubmissions'), where('userId', '==', userId));
+                        const snaps = await getDocs(q);
+                        let earliest = null;
+                        snaps.forEach(s => {
+                            const d = s.data();
+                            if (d && d.submissionDate) {
+                                const parsed = new Date(d.submissionDate);
+                                if (!isNaN(parsed)) {
+                                    if (!earliest || parsed < earliest) earliest = parsed;
+                                }
+                            }
+                        });
+                        if (earliest) startDate = new Date(earliest.getFullYear(), earliest.getMonth(), earliest.getDate());
+                    } catch (e) {
+                        console.warn('Could not query earliest submission date:', e);
+                    }
+                }
+
+                // Fallback to 30 days ago if no startDate could be determined
+                if (!startDate) {
+                    startDate = new Date();
+                    startDate.setDate(startDate.getDate() - 30);
+                    startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                }
+
+                const today = new Date();
+                const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+                // If startDate is in the future, clamp to today
+                if (startDate > endDate) startDate = new Date(endDate);
+
+                // Build list of dates from endDate down to startDate (descending order)
+                const dates = [];
+                for (let d = new Date(endDate); d >= startDate; d.setDate(d.getDate() - 1)) {
+                    dates.push(toIsoDate(d));
+                }
+
+                // Populate selector
                 selector.innerHTML = '';
                 dates.forEach(d => {
                     const opt = document.createElement('option');
