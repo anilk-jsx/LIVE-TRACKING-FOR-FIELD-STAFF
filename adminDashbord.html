@@ -109,6 +109,32 @@
             // Basic online/offline diagnostic logs
             window.addEventListener('online', () => console.log('Network: online'));
             window.addEventListener('offline', () => console.warn('Network: offline - Firestore may fail to reach backend'));
+            
+            // Enforce authentication: wait for Firebase Auth state and reveal/redirect accordingly.
+            try {
+                if (typeof onAuthStateChanged === 'function' && auth) {
+                    // Keep page hidden until auth state is resolved (body starts with class "auth-hidden").
+                    onAuthStateChanged(auth, (user) => {
+                        if (!user) {
+                            console.warn('No authenticated user found - redirecting to login');
+                            try { history.replaceState(null, '', 'index.html'); } catch (e) {}
+                            location.replace('index.html');
+                            return;
+                        }
+
+                        // Authenticated: reveal the page.
+                        try { document.body.classList.remove('auth-hidden'); } catch (e) {}
+                        console.log('Authenticated user:', user.uid);
+                    });
+                } else {
+                    // If auth or onAuthStateChanged not available for some reason, fail-safe redirect.
+                    console.error('Auth or onAuthStateChanged not available - redirecting as a precaution');
+                    setTimeout(() => { try { history.replaceState(null, '', 'index.html'); } catch (e) {} ; location.replace('index.html'); }, 800);
+                }
+            } catch (e) {
+                console.error('Error while enforcing auth gate:', e);
+                setTimeout(() => { try { history.replaceState(null, '', 'index.html'); } catch (err) {} ; location.replace('index.html'); }, 800);
+            }
         } catch (error) {
             console.error('Firebase initialization error:', error);
             
@@ -150,9 +176,14 @@
             box-sizing: border-box;
         }
 
-        html {
+            html {
             scroll-behavior: smooth;
             overflow-y: auto; /* Ensure vertical scrolling is available */
+        }
+
+        /* Hide page while authentication is being verified to prevent unauthorized viewing */
+        .auth-hidden {
+            visibility: hidden !important;
         }
 
         body {
@@ -2095,7 +2126,7 @@
         }
     </style>
 </head>
-<body>
+<body class="auth-hidden">
     <!-- Mobile Sidebar Toggle -->
     <button class="mobile-sidebar-toggle" onclick="toggleSidebar()">
         <div class="hamburger-line"></div>
