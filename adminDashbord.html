@@ -2230,17 +2230,32 @@
 
                     <div class="form-group">
                         <label for="constituency">Constituency <span class="required">*</span></label>
-                        <input type="text" id="constituency" name="constituency" required placeholder="Enter constituency name">
+                        <select id="constituency" name="constituency" required>
+                            <option value="">Select Constituency</option>
+                            <!-- Populated dynamically from API when district selected -->
+                            <option value="other">Other (enter manually)</option>
+                        </select>
+                        <input type="text" id="constituency_manual" name="constituency_manual" placeholder="Enter constituency (if Other)" style="display:none;margin-top:8px;">
                     </div>
 
                     <div class="form-group">
                         <label for="block">Block <span class="required">*</span></label>
-                        <input type="text" id="block" name="block" required placeholder="Enter block name">
+                        <select id="block" name="block" required>
+                            <option value="">Select Block</option>
+                            <!-- Populated dynamically from API when district selected -->
+                            <option value="other">Other (enter manually)</option>
+                        </select>
+                        <input type="text" id="block_manual" name="block_manual" placeholder="Enter block (if Other)" style="display:none;margin-top:8px;">
                     </div>
 
                     <div class="form-group">
                         <label for="gpWard">GP/Ward <span class="required">*</span></label>
-                        <input type="text" id="gpWard" name="gpWard" required placeholder="Enter GP/Ward name">
+                        <select id="gpWard" name="gpWard" required>
+                            <option value="">Select GP / Ward</option>
+                            <!-- Populated dynamically from API when block selected -->
+                            <option value="other">Other (enter manually)</option>
+                        </select>
+                        <input type="text" id="gpWard_manual" name="gpWard_manual" placeholder="Enter GP/Ward (if Other)" style="display:none;margin-top:8px;">
                     </div>
 
                     <div class="form-group">
@@ -2407,26 +2422,69 @@
             
             // Clear existing options
             districtSelect.innerHTML = '<option value="">Select District</option>';
-            
-            // Add all Odisha districts
-            ODISHA_DISTRICTS.forEach(district => {
-                const option = document.createElement('option');
-                option.value = district;
-                option.textContent = district;
-                districtSelect.appendChild(option);
-            });
+
+            // Try fetching actual districts from SPDP API; fallback to local list
+            const apiUrl = 'https://spdp.apps.prod.osdc.gov.in/externalAPI/getDistrictDetailsServices';
+
+            fetch(apiUrl)
+                .then(resp => {
+                    if (!resp.ok) throw new Error('Network response was not ok');
+                    return resp.json();
+                })
+                .then(data => {
+                    // data expected to be an array with objects containing distName or distName
+                    if (Array.isArray(data) && data.length > 0) {
+                        data.forEach(item => {
+                            const name = item.distName || item.distName || item.distNameOdia || item.distNameEnglish || item.name;
+                            if (name) {
+                                const option = document.createElement('option');
+                                option.value = name.trim();
+                                option.textContent = name.trim();
+                                districtSelect.appendChild(option);
+                            }
+                        });
+                        console.log('Districts loaded from remote API');
+                    } else {
+                        throw new Error('Invalid district data from API');
+                    }
+                })
+                .catch(err => {
+                    console.warn('Failed to load districts from API, using local list:', err);
+                    // Add all Odisha districts (fallback)
+                    ODISHA_DISTRICTS.forEach(district => {
+                        const option = document.createElement('option');
+                        option.value = district;
+                        option.textContent = district;
+                        districtSelect.appendChild(option);
+                    });
+                });
 
             // Also populate the district filter on the officers list view (if present)
             try {
                 const filter = document.getElementById('districtFilter');
                 if (filter) {
                     filter.innerHTML = '<option value="">All Districts</option>';
-                    ODISHA_DISTRICTS.forEach(district => {
-                        const opt = document.createElement('option');
-                        opt.value = district;
-                        opt.textContent = district;
-                        filter.appendChild(opt);
-                    });
+                    // Try to reuse already loaded district options from district select
+                    setTimeout(() => {
+                        const districtSelect = document.getElementById('district');
+                        if (districtSelect && districtSelect.options.length > 1) {
+                            Array.from(districtSelect.options).forEach(opt => {
+                                if (opt.value) {
+                                    const copy = document.createElement('option');
+                                    copy.value = opt.value;
+                                    copy.textContent = opt.textContent;
+                                    filter.appendChild(copy);
+                                }
+                            });
+                        } else {
+                            ODISHA_DISTRICTS.forEach(district => {
+                                const opt = document.createElement('option');
+                                opt.value = district;
+                                opt.textContent = district;
+                                filter.appendChild(opt);
+                            });
+                        }
+                    }, 500);
                 }
             } catch (e) {
                 console.warn('Could not populate districtFilter:', e);
@@ -2439,6 +2497,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Initialize static district dropdown
             initializeDistricts();
+            // Wire up dependent selects
+            wireLocationSelects();
             
             // Generate and set officer ID when page loads
             generateAndSetOfficerID();
@@ -2466,6 +2526,238 @@
 
             // Note: Removed navbar scroll effect as it was targeting non-existent elements
         });
+
+        // Wire select change handlers and manual "Other" inputs
+        function wireLocationSelects() {
+            const districtSel = document.getElementById('district');
+            const constituencySel = document.getElementById('constituency');
+            const blockSel = document.getElementById('block');
+            const gpSel = document.getElementById('gpWard');
+
+            const constituencyManual = document.getElementById('constituency_manual');
+            const blockManual = document.getElementById('block_manual');
+            const gpManual = document.getElementById('gpWard_manual');
+
+            // When district changes, fetch constituencies & blocks
+            districtSel.addEventListener('change', async function() {
+                const district = this.value;
+                clearSelect(constituencySel, 'Select Constituency');
+                clearSelect(blockSel, 'Select Block');
+                clearSelect(gpSel, 'Select GP / Ward');
+
+                if (!district) return;
+
+                // Fetch ACs (constituencies)
+                fetchConstituenciesByDistrict(district).then(list => {
+                    populateSelect(constituencySel, list, 'name');
+                }).catch(e => console.warn('AC fetch failed', e));
+
+                // Fetch blocks
+                fetchBlocksByDistrict(district).then(list => {
+                    populateSelect(blockSel, list, 'blockULBName');
+                }).catch(e => console.warn('Block fetch failed', e));
+            });
+
+            // When block changes, fetch GP/Wards
+            blockSel.addEventListener('change', function() {
+                const block = this.value;
+                clearSelect(gpSel, 'Select GP / Ward');
+                if (!block) return;
+
+                fetchGPsByBlock(block).then(list => {
+                    populateSelect(gpSel, list, 'panchayatName');
+                }).catch(e => console.warn('GP fetch failed', e));
+            });
+
+            // Show manual input if "other" selected
+            [constituencySel, blockSel, gpSel].forEach(sel => {
+                sel.addEventListener('change', function() {
+                    const manual = document.getElementById(sel.id + '_manual');
+                    if (!manual) return;
+                    if (this.value === 'other') {
+                        manual.style.display = 'block';
+                        manual.required = true;
+                    } else {
+                        manual.style.display = 'none';
+                        manual.required = false;
+                    }
+                });
+            });
+        }
+
+        function clearSelect(sel, placeholder) {
+            sel.innerHTML = '';
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = placeholder;
+            sel.appendChild(opt);
+            const other = document.createElement('option');
+            other.value = 'other';
+            other.textContent = 'Other (enter manually)';
+            sel.appendChild(other);
+        }
+
+        function populateSelect(sel, items, key) {
+            if (!Array.isArray(items)) return;
+            // remove existing options except placeholder
+            const base = sel.querySelector('option');
+            sel.innerHTML = '';
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = sel === document.getElementById('gpWard') ? 'Select GP / Ward' : sel === document.getElementById('block') ? 'Select Block' : 'Select Constituency';
+            sel.appendChild(placeholder);
+
+            items.forEach(item => {
+                const text = (item[key] || item.acName || item.distName || item.blockULBName || item.panchayatName || item.villageName || item.name || '').toString().trim();
+                if (!text) return;
+                const option = document.createElement('option');
+                option.value = text;
+                option.textContent = text;
+                // attach common SPDP ids to option dataset if present
+                if (item.distSPDPID) option.dataset.distSpdpid = item.distSPDPID;
+                if (item.distLGDCode) option.dataset.distLgdc = item.distLGDCode;
+                if (item.blockULBSPDPID) option.dataset.blockSpdpid = item.blockULBSPDPID;
+                if (item.blockULBLGDCode) option.dataset.blockLgdc = item.blockULBLGDCode;
+                if (item.panchayatSPDPID) option.dataset.panchayatSpdpid = item.panchayatSPDPID;
+                if (item.panchayatULBSPDPID) option.dataset.panchayatUlbsd = item.panchayatULBSPDPID;
+                if (item.acSPDPID) option.dataset.acSpdpid = item.acSPDPID;
+                if (item.acULBSPDPID) option.dataset.acUlbspdpid = item.acULBSPDPID;
+                sel.appendChild(option);
+            });
+
+            const other = document.createElement('option');
+            other.value = 'other';
+            other.textContent = 'Other (enter manually)';
+            sel.appendChild(other);
+        }
+
+        // Helpers to call SPDP endpoints
+        async function fetchConstituenciesByDistrict(districtName) {
+            // Try different endpoints; filter by district name
+            const attempts = [
+                { url: 'https://spdp.apps.prod.osdc.gov.in/externalAPI/getACDetailsServices', parse: (d) => d },
+                { url: 'https://spdp.apps.prod.osdc.gov.in/externalAPI/getAssemblyConstituencyByDistrict', parse: (d) => d },
+                { url: 'https://spdp.apps.prod.osdc.gov.in/externalAPI/getACByDistrict', parse: (d) => d }
+            ];
+
+            // First: try endpoints without params, filter by distName
+            for (const attempt of attempts) {
+                try {
+                    const resp = await fetch(attempt.url);
+                    if (!resp.ok) throw new Error(`${attempt.url} not ok`);
+                    const data = await resp.json();
+                    if (Array.isArray(data) && data.length) {
+                        // try to filter by district name
+                        const filtered = data.filter(i => ((i.distName || i.district || '') + '').toLowerCase() === districtName.toLowerCase());
+                        if (filtered.length) {
+                            console.log('Constituencies loaded from', attempt.url);
+                            return filtered.map(i => ({ name: i.acName || i.acULBName || i.name || i.constituencyName || i.ACName || i.AC }));
+                        }
+                        // If items don't include distName, but look like constituency list, return all
+                        const looksLikeAC = data.some(i => i.acName || i.constituencyName || i.ACName || i.acULBName);
+                        if (looksLikeAC) {
+                            console.log('Constituencies loaded from', attempt.url, 'without district filter');
+                            return data.map(i => ({ name: i.acName || i.acULBName || i.name || i.constituencyName || i.ACName || i.AC }));
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Attempt failed for', attempt.url, e);
+                    continue;
+                }
+            }
+
+            // Second: try using district SPDP ID if available from districts endpoint
+            try {
+                const districts = await (await fetch('https://spdp.apps.prod.osdc.gov.in/externalAPI/getDistrictDetailsServices')).json();
+                const match = districts.find(d => (d.distName || '').toLowerCase() === districtName.toLowerCase());
+                if (match && (match.distSPDPID || match.distLGDCode)) {
+                    const id = match.distSPDPID || match.distLGDCode;
+                    const byIdUrls = [
+                        `https://spdp.apps.prod.osdc.gov.in/externalAPI/getACByDistrict?distSPDPID=${encodeURIComponent(id)}`,
+                        `https://spdp.apps.prod.osdc.gov.in/externalAPI/getAssemblyConstituencyByDistrict?distSPDPID=${encodeURIComponent(id)}`
+                    ];
+                    for (const u of byIdUrls) {
+                        try {
+                            const r = await fetch(u);
+                            if (!r.ok) throw new Error(`${u} not ok`);
+                            const d = await r.json();
+                            if (Array.isArray(d) && d.length) {
+                                console.log('Constituencies loaded from', u);
+                                return d.map(i => ({ name: i.acName || i.acULBName || i.name || i.constituencyName }));
+                            }
+                        } catch (e2) { console.warn('By-id attempt failed', u, e2); }
+                    }
+                }
+            } catch (e) {
+                console.warn('District lookup for AC by id failed', e);
+            }
+
+            // Final fallback: return empty array so user can enter manually
+            return [];
+        }
+
+        async function fetchBlocksByDistrict(districtName) {
+            const url = 'https://spdp.apps.prod.osdc.gov.in/externalAPI/getBlockDetailsServices';
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) throw new Error('Block endpoint not ok');
+                const data = await resp.json();
+                return data.filter(i => (i.distName || '').toLowerCase() === districtName.toLowerCase());
+            } catch (e) {
+                console.warn('fetchBlocksByDistrict failed', e);
+                return [];
+            }
+        }
+
+        async function fetchGPsByBlock(blockName) {
+            // Primary GP endpoint (provided by you)
+            const gpUrl = 'https://spdp.apps.prod.osdc.gov.in/externalAPI/getGpDetailsServices';
+            try {
+                const resp = await fetch(gpUrl);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (Array.isArray(data) && data.length) {
+                        // Try to match by block name or blockULBName
+                        const filtered = data.filter(i => {
+                            const bn = (i.blockULBName || i.blockName || i.subdivisionName || '').toString().toLowerCase();
+                            const pn = (i.panchayatName || i.gpName || i.panchayat || i.villageName || '').toString().toLowerCase();
+                            return bn === blockName.toLowerCase() || pn === blockName.toLowerCase();
+                        });
+                        if (filtered.length) return filtered.map(i => ({ panchayatName: i.panchayatName || i.gpName || i.panchayat || i.villageName || i.name, panchayatSPDPID: i.panchayatSPDPID || i.panchayatULBSPDPID }));
+
+                        // If no exact block match, try filtering by containing block name
+                        const contains = data.filter(i => ((i.blockULBName || i.blockName || '').toString().toLowerCase().includes(blockName.toLowerCase())));
+                        if (contains.length) return contains.map(i => ({ panchayatName: i.panchayatName || i.gpName || i.panchayat || i.villageName || i.name, panchayatSPDPID: i.panchayatSPDPID || i.panchayatULBSPDPID }));
+
+                        // If still nothing, but data looks like GP list, return names from data
+                        const looksLikeGP = data.some(i => i.panchayatName || i.gpName || i.panchayat);
+                        if (looksLikeGP) return data.map(i => ({ panchayatName: i.panchayatName || i.gpName || i.panchayat || i.villageName || i.name }));
+                    }
+                }
+            } catch (e) {
+                console.warn('Primary GP endpoint failed:', e);
+            }
+
+            // Fallback: try village/panchayat endpoints
+            const candidates = [
+                'https://spdp.apps.prod.osdc.gov.in/externalAPI/getPanchayatDetailsServices',
+                'https://spdp.apps.prod.osdc.gov.in/externalAPI/getVillageDetailsServices'
+            ];
+
+            for (const url of candidates) {
+                try {
+                    const resp = await fetch(url);
+                    if (!resp.ok) continue;
+                    const data = await resp.json();
+                    const filtered = data.filter(i => ((i.blockULBName || i.blockName || '').toLowerCase() === blockName.toLowerCase()) || ((i.blockULBName || '').toLowerCase().includes(blockName.toLowerCase())));
+                    if (filtered && filtered.length) return filtered.map(i => ({ panchayatName: i.panchayatName || i.villageName || i.name }));
+                } catch (e) {
+                    console.warn('GP candidate failed:', url, e);
+                }
+            }
+
+            return [];
+        }
 
         // Note: updateBlocks() and updateGpWards() functions removed since 
         // constituency, block, and GP/Ward are now text input fields
