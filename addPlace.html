@@ -821,9 +821,11 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="wardNumber">Ward Number <span class="required">*</span></label>
-                    <input type="number" id="wardNumber" name="wardNumber" required>
+                    <label for="gpWard">GP / Ward (auto-filled)</label>
+                    <input type="text" id="gpWard" name="gpWard" readonly placeholder="Fetching from profile...">
                 </div>
+
+                <!-- Ward Number removed; GP/Ward will be auto-filled from the logged-in user's profile in Firestore -->
             </div>
 
             <!-- Photo Section -->
@@ -1092,10 +1094,11 @@
                             landmarkInput.value = landmark;
                         }
 
-                        // Extract ward number from address components
+                        // Extract ward number from address components and set GP/Ward display if possible
                         const wardNumber = extractWardNumber(data);
                         if (wardNumber) {
-                            document.getElementById('wardNumber').value = wardNumber;
+                            const gpEl = document.getElementById('gpWard');
+                            if (gpEl) gpEl.value = `Ward ${wardNumber}`;
                         }
                     }
                 } else {
@@ -1191,9 +1194,10 @@
                             }
                         }
 
-                        // Set ward number if found
+                        // Set GP/Ward display if wardNumber found in fallback
                         if (data.wardNumber) {
-                            document.getElementById('wardNumber').value = data.wardNumber;
+                            const gpEl = document.getElementById('gpWard');
+                            if (gpEl) gpEl.value = `Ward ${data.wardNumber}`;
                             console.log(`Ward number found: ${data.wardNumber}`);
                         }
 
@@ -1363,10 +1367,9 @@
             const latitude = latitudeInput.value.trim();
             const longitude = longitudeInput.value.trim();
             const address = addressInput.value.trim();
-            const wardNumber = document.getElementById('wardNumber').value;
-
-            if (!latitude || !longitude || !address || !wardNumber) {
-                alert('Please fill in all required fields including Ward Number.');
+            // Validate required fields (ward number removed - GP/Ward auto-filled)
+            if (!latitude || !longitude || !address) {
+                alert('Please fill in all required fields.');
                 return;
             }
 
@@ -1403,7 +1406,8 @@
                 longitude: parseFloat(longitude),
                 addressDetail: address,
                 landmark: landmarkInput.value.trim() || 'Not specified',
-                wardNumber: wardNumber || 'Not specified',
+                // GP/Ward will be taken from the user's profile (if available)
+                gpWard: document.getElementById('gpWard') ? document.getElementById('gpWard').value : '',
                 dateTime: submissionTime.toISOString(),
                 submittedAt: formattedTime
             };
@@ -1563,8 +1567,7 @@
                         longitude: parseFloat(formData.longitude) || 0,
                         addressDetail: formData.addressDetail || '',
                         landmark: formData.landmark || '',
-                        wardNumber: formData.wardNumber || '',
-                        ward: parseInt(formData.wardNumber) || null
+                        gpWard: formData.gpWard || ''
                     },
                     submissionTime: {
                         timestamp: currentTime,
@@ -1908,6 +1911,101 @@ Would you like to try submitting with fewer photos?
 
         // Initialize
         console.log('Add Place form initialized with Firebase integration');
+
+        // --- Auto-fill GP/Ward from Firestore for the logged-in user ---
+        async function populateUserGpWard() {
+            const gpInput = document.getElementById('gpWard');
+
+            if (!gpInput) return;
+
+            gpInput.value = '';
+
+            try {
+                if (!window.firebaseDB) {
+                    gpInput.placeholder = 'Firebase not initialized';
+                    return;
+                }
+
+                const { doc, getDoc } = window.firebaseModules || {};
+                const userId = getUserId();
+                let userData = null;
+
+                // Try fetching document directly by userId (common case)
+                try {
+                    if (doc && getDoc) {
+                        const userRef = doc(window.firebaseDB, 'users', userId);
+                        const snap = await getDoc(userRef);
+                        if (snap && snap.exists && snap.exists()) {
+                            userData = snap.data();
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Direct getDoc failed:', e);
+                }
+
+                // If not found by doc id, try querying common identifying fields (id, username)
+                if (!userData) {
+                    try {
+                        const fb = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+                        const { collection, query, where, getDocs } = fb;
+                        const usersCol = collection(window.firebaseDB, 'users');
+
+                        let q = query(usersCol, where('id', '==', userId));
+                        let qSnap = await getDocs(q);
+
+                        if (qSnap.empty) {
+                            q = query(usersCol, where('username', '==', userId));
+                            qSnap = await getDocs(q);
+                        }
+
+                        if (!qSnap.empty) {
+                            userData = qSnap.docs[0].data();
+                        }
+                    } catch (qErr) {
+                        console.warn('Query fallback failed:', qErr);
+                    }
+                }
+
+                if (!userData) {
+                    gpInput.placeholder = 'Profile not found';
+                    return;
+                }
+
+                // Candidate keys to look for GP/Ward information
+                const candidates = ['gpWard', 'gp_ward', 'gp-ward', 'gpward', 'gp', 'ward', 'village_street', 'block_mc_nac_town'];
+                let gpString = null;
+
+                for (const k of candidates) {
+                    if (userData[k]) {
+                        gpString = userData[k];
+                        break;
+                    }
+                }
+
+                // Try to detect fields by name if not found above
+                if (!gpString) {
+                    for (const key in userData) {
+                        if (key.toLowerCase().includes('gp') || key.toLowerCase().includes('ward')) {
+                            gpString = userData[key];
+                            break;
+                        }
+                    }
+                }
+
+                if (gpString) {
+                    gpInput.value = gpString;
+                } else {
+                    gpInput.placeholder = 'GP/Ward not specified in profile';
+                }
+
+            } catch (err) {
+                console.error('populateUserGpWard error', err);
+                gpInput.placeholder = 'Auto-fetch failed (see console)';
+            }
+        }
+
+        // Populate on load (allow a short delay to ensure firebase init)
+        setTimeout(populateUserGpWard, 1200);
     </script>
 </body>
 
