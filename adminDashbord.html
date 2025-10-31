@@ -12,6 +12,31 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     
+    <!-- Quick client-side guard: if there's no stored session (sessionStorage or localStorage),
+         immediately redirect to login to prevent direct access via Go Live/local file. -->
+    <script>
+        (function(){
+            try {
+                // sessionStorage is per-tab; localStorage persists across tabs.
+                const sessionUser = sessionStorage.getItem('currentUser');
+                const persistentUser = localStorage.getItem('currentUser');
+
+                // If neither exists, immediately replace location so Back won't return here.
+                if (!sessionUser && !persistentUser) {
+                    // Small timeout to ensure this runs after any quick restore attempts,
+                    // but still before the heavy Firebase module loads.
+                    setTimeout(function(){
+                        try { history.replaceState(null, '', 'index.html'); } catch(e){}
+                        location.replace('index.html');
+                    }, 10);
+                }
+            } catch (e) {
+                try { history.replaceState(null, '', 'index.html'); } catch(err){}
+                location.replace('index.html');
+            }
+        })();
+    </script>
+
     <!-- Firebase imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
