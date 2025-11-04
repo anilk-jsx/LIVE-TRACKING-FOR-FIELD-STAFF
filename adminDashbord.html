@@ -11,20 +11,24 @@
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    
-    <!-- Quick client-side guard: if there's no stored session (sessionStorage or localStorage),
-         immediately redirect to login to prevent direct access via Go Live/local file. -->
+    <script src="session.js"></script>
+
+    <!-- Quick client-side guard: require a valid session, otherwise redirect to login -->
     <script>
         (function(){
             try {
+                // If session.js is available, prefer its requireLogin guard.
+                if (typeof requireLogin === 'function') {
+                    requireLogin({ redirectUrl: 'index.html' });
+                    return;
+                }
+
                 // sessionStorage is per-tab; localStorage persists across tabs.
                 const sessionUser = sessionStorage.getItem('currentUser');
                 const persistentUser = localStorage.getItem('currentUser');
 
                 // If neither exists, immediately replace location so Back won't return here.
                 if (!sessionUser && !persistentUser) {
-                    // Small timeout to ensure this runs after any quick restore attempts,
-                    // but still before the heavy Firebase module loads.
                     setTimeout(function(){
                         try { history.replaceState(null, '', 'index.html'); } catch(e){}
                         location.replace('index.html');

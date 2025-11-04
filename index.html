@@ -481,6 +481,8 @@
         </div>
     </div>
 
+    <script src="session.js"></script>
+
     <script>
         // Get form elements
         const loginForm = document.getElementById('loginForm');
@@ -749,14 +751,24 @@
                 const authResult = await authenticateUser(email, password);
 
                 if (authResult.success) {
-                        // Save user session data to sessionStorage (tab) and localStorage (persistent across tabs)
-                        const currentUserObj = JSON.stringify({
-                            ...authResult.user,
-                            loginTime: new Date().toISOString()
-                        });
-                        sessionStorage.setItem('currentUser', currentUserObj);
-                        try { localStorage.setItem('currentUser', currentUserObj); } catch (e) { /* ignore storage errors */ }
-
+                        // Save user session data to sessionStorage/localStorage using session manager
+                        try {
+                            window.setSession({
+                                uid: authResult.user.uid,
+                                email: authResult.user.email,
+                                staffId: authResult.user.staffId,
+                                isAdmin: authResult.user.isAdmin,
+                                userType: authResult.user.userType
+                            });
+                        } catch (e) {
+                            // Fallback to direct storage if session manager unavailable
+                            const currentUserObj = JSON.stringify({
+                                ...authResult.user,
+                                loginTime: new Date().toISOString()
+                            });
+                            sessionStorage.setItem('currentUser', currentUserObj);
+                            try { localStorage.setItem('currentUser', currentUserObj); } catch (e) { /* ignore storage errors */ }
+                        }
                     // Redirect immediately based on user type (no success message)
                     if (authResult.user.isAdmin) {
                         window.location.href = './adminDashbord.html'; // Fixed to match actual file name
@@ -830,11 +842,11 @@
         window.logoutUser = async function () {
             try {
                 await window.signOut(window.firebaseAuth);
-                sessionStorage.removeItem('currentUser');
-                try { localStorage.removeItem('currentUser'); } catch(e) {}
-                window.location.href = './index.html';
-            } catch (error) {
-                // Silently handle logout errors
+            } catch (e) {}
+            try { window.clearSession(); } catch (e) {
+                try { sessionStorage.removeItem('currentUser'); } catch (er) {}
+                try { localStorage.removeItem('currentUser'); } catch (er) {}
+                try { location.replace('index.html'); } catch (er) {}
             }
         };
     </script>
