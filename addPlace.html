@@ -822,7 +822,8 @@
 
                 <div class="form-group">
                     <label for="landmark">Nearby Landmark</label>
-                    <input type="text" id="landmark" name="landmark" placeholder="e.g., Near City Mall, Opposite Bank">
+                    <input type="text" id="landmark" name="landmark" list="landmarkSuggestions" placeholder="e.g., Near City Mall, Opposite Bank">
+                    <datalist id="landmarkSuggestions"></datalist>
                 </div>
 
                 <div class="form-group">
@@ -1015,300 +1016,7 @@
             }
         });
 
-        // Update the use location button event listener
-        useLocationBtn.addEventListener('click', function () {
-            if (!navigator.geolocation) {
-                showLocationStatus('Geolocation is not supported by this browser.', 'error');
-                return;
-            }
-
-            useLocationBtn.disabled = true;
-            useLocationBtn.innerHTML = '<div class="spinner"></div>Getting location...';
-            showLocationStatus('Getting your current location...', 'loading');
-
-            navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-
-                    // Update input fields
-                    latitudeInput.value = lat.toFixed(6);
-                    longitudeInput.value = lng.toFixed(6);
-
-                    // Get address using reverse geocoding with fallbacks
-                    try {
-                        await reverseGeocodeWithFallbacks(lat, lng);
-                        showLocationStatus('✅ Location and address fetched successfully!', 'success');
-                    } catch (error) {
-                        showLocationStatus('✅ Location found! Please enter the address manually.', 'success');
-                        // Focus on address field for manual entry
-                        setTimeout(() => {
-                            addressInput.focus();
-                        }, 1000);
-                    }
-
-                    useLocationBtn.disabled = false;
-                    useLocationBtn.innerHTML = '<span>📍</span>Use My Current Location';
-                },
-                (error) => {
-                    let message = 'Unable to get location. ';
-                    switch (error.code) {
-                        case error.PERMISSION_DENIED:
-                            message += 'Please allow location access.';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            message += 'Location information unavailable.';
-                            break;
-                        case error.TIMEOUT:
-                            message += 'Location request timed out.';
-                            break;
-                        default:
-                            message += 'Unknown error occurred.';
-                            break;
-                    }
-                    showLocationStatus(message, 'error');
-                    useLocationBtn.disabled = false;
-                    useLocationBtn.innerHTML = '<span>📍</span>Use My Current Location';
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
-                }
-            );
-        });
-
-        // Update the reverse geocoding function to include ward number extraction
-        async function reverseGeocode(lat, lng) {
-            try {
-                // Option 1: Use a CORS proxy service
-                const proxyUrl = 'https://api.allorigins.win/raw?url=';
-                const apiUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
-                const response = await fetch(proxyUrl + encodeURIComponent(apiUrl));
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data && data.display_name) {
-                        addressInput.value = data.display_name;
-
-                        // Try to extract landmark information
-                        const address = data.address || {};
-                        const landmark = address.shop || address.amenity || address.tourism ||
-                            address.leisure || address.building || '';
-                        if (landmark) {
-                            landmarkInput.value = landmark;
-                        }
-
-                        // Extract ward number from address components and set GP/Ward display if possible
-                        const wardNumber = extractWardNumber(data);
-                        if (wardNumber) {
-                            const gpEl = document.getElementById('gpWard');
-                            if (gpEl) gpEl.value = `Ward ${wardNumber}`;
-                        }
-                    }
-                } else {
-                    // Fallback to manual address entry
-                    throw new Error('Geocoding service unavailable');
-                }
-            } catch (error) {
-                console.error('Reverse geocoding failed:', error);
-                // Fallback: Set a generic address format
-                const genericAddress = `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-                addressInput.value = genericAddress;
-                addressInput.placeholder = "Please enter the complete address manually";
-                throw error;
-            }
-        }
-        // Alternative reverse geocoding function with multiple fallbacks including ward number
-        async function reverseGeocodeWithFallbacks(lat, lng) {
-            const fallbackMethods = [
-                // Method 1: AllOrigins CORS proxy with Nominatim
-                async () => {
-                    const proxyUrl = 'https://api.allorigins.win/raw?url=';
-                    const apiUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
-                    const response = await fetch(proxyUrl + encodeURIComponent(apiUrl));
-                    const data = await response.json();
-
-                    // Extract ward number from Nominatim data
-                    const wardNumber = extractWardNumber(data);
-
-                    return {
-                        ...data,
-                        wardNumber: wardNumber
-                    };
-                },
-
-                // Method 2: BigDataCloud API (free alternative)
-                async () => {
-                    const overpassQuery = `
-                [out:json][timeout:10];
-                (
-                  relation["admin_level"~"^(8|9|10)$"]["boundary"="administrative"](around:1000,${lat},${lng});
-                );
-                out geom;
-            `;
-
-                    const overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
-                    const proxyUrl = 'https://api.allorigins.win/raw?url=';
-
-                    const response = await fetch(proxyUrl + encodeURIComponent(overpassUrl));
-                    const data = await response.json();
-
-                    let wardNumber = null;
-                    if (data.elements && data.elements.length > 0) {
-                        // Look for ward information in the administrative boundaries
-                        for (const element of data.elements) {
-                            if (element.tags) {
-                                const name = element.tags.name;
-                                if (name && (name.toLowerCase().includes('ward') || name.match(/\d+/))) {
-                                    const match = name.match(/ward\s*(\d+)|(\d+)\s*ward/i);
-                                    if (match) {
-                                        wardNumber = match[1] || match[2];
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    return {
-                        display_name: `Administrative Area near ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-                        wardNumber: wardNumber
-                    };
-                }
-            ];
-
-            for (let i = 0; i < fallbackMethods.length; i++) {
-                try {
-                    console.log(`Trying geocoding method ${i + 1}...`);
-                    const data = await fallbackMethods[i]();
-
-                    if (data && (data.display_name || data.locality)) {
-                        const displayName = data.display_name ||
-                            `${data.locality || ''}, ${data.principalSubdivision || ''}, ${data.countryName || ''}`.replace(/^,\s*|,\s*$/g, '');
-
-                        addressInput.value = displayName;
-
-                        // Extract landmark if available
-                        if (data.address) {
-                            const address = data.address;
-                            const landmark = address.shop || address.amenity || address.tourism ||
-                                address.leisure || address.building || address.city || address.locality || '';
-                            if (landmark) {
-                                landmarkInput.value = landmark;
-                            }
-                        }
-
-                        // Set GP/Ward display if wardNumber found in fallback
-                        if (data.wardNumber) {
-                            const gpEl = document.getElementById('gpWard');
-                            if (gpEl) gpEl.value = `Ward ${data.wardNumber}`;
-                            console.log(`Ward number found: ${data.wardNumber}`);
-                        }
-
-                        console.log(`Geocoding successful with method ${i + 1}`);
-                        return;
-                    }
-                } catch (error) {
-                    console.warn(`Geocoding method ${i + 1} failed:`, error);
-                    continue;
-                }
-            }
-
-            // If all methods fail, provide coordinates as address
-            const genericAddress = `Location: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-            addressInput.value = genericAddress;
-            addressInput.placeholder = "Please enter the complete address manually";
-            throw new Error('All geocoding methods failed');
-        }
-
-        // Function to extract ward number from Nominatim data
-        function extractWardNumber(data) {
-            if (!data.address) return null;
-
-            const address = data.address;
-
-            // Common ward-related fields in different countries/regions
-            const wardFields = [
-                'ward', 'district', 'suburb', 'neighbourhood', 'quarter',
-                'city_district', 'borough', 'subdistrict', 'administrative'
-            ];
-
-            // Check each field for ward number
-            for (const field of wardFields) {
-                if (address[field]) {
-                    const value = address[field].toString();
-
-                    // Look for patterns like "Ward 5", "5th Ward", "District 12", etc.
-                    const wardMatches = [
-                        value.match(/ward\s*(\d+)/i),
-                        value.match(/(\d+)\s*ward/i),
-                        value.match(/district\s*(\d+)/i),
-                        value.match(/(\d+)\s*district/i),
-                        value.match(/zone\s*(\d+)/i),
-                        value.match(/(\d+)\s*zone/i),
-                        value.match(/^(\d+)$/), // Just a number
-                        value.match(/(\d+)/) // Any number in the string
-                    ];
-
-                    for (const match of wardMatches) {
-                        if (match && match[1]) {
-                            const wardNum = parseInt(match[1]);
-                            if (wardNum > 0 && wardNum < 1000) { // Reasonable ward number range
-                                return wardNum;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Check display_name for ward information
-            if (data.display_name) {
-                const displayMatch = data.display_name.match(/ward\s*(\d+)|(\d+)\s*ward/i);
-                if (displayMatch) {
-                    const wardNum = parseInt(displayMatch[1] || displayMatch[2]);
-                    if (wardNum > 0 && wardNum < 1000) {
-                        return wardNum;
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        // Function to extract ward number from BigDataCloud data
-        function extractWardNumberFromBigDataCloud(data) {
-            const searchFields = [
-                data.locality, data.localityInfo?.administrative?.[0]?.name,
-                data.localityInfo?.administrative?.[1]?.name,
-                data.localityInfo?.administrative?.[2]?.name,
-                data.city, data.principalSubdivision
-            ];
-
-            for (const field of searchFields) {
-                if (field) {
-                    const wardMatches = [
-                        field.match(/ward\s*(\d+)/i),
-                        field.match(/(\d+)\s*ward/i),
-                        field.match(/district\s*(\d+)/i),
-                        field.match(/(\d+)\s*district/i),
-                        field.match(/zone\s*(\d+)/i),
-                        field.match(/(\d+)\s*zone/i)
-                    ];
-
-                    for (const match of wardMatches) {
-                        if (match && match[1]) {
-                            const wardNum = parseInt(match[1]);
-                            if (wardNum > 0 && wardNum < 1000) {
-                                return wardNum;
-                            }
-                        }
-                    }
-                }
-            }
-
-            return null;
-        }
+    // Location helper provided by external module (included at end of file)
         // Show location status
         function showLocationStatus(message, type) {
             locationStatus.textContent = message;
@@ -1321,6 +1029,321 @@
                 }, 3000);
             }
         }
+
+        // Get current position as a Promise
+        function getCurrentPositionPromise(options = {}) {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation is not supported by this browser.'));
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(resolve, reject, options);
+            });
+        }
+
+    // --- Configuration: set your Mapbox token here for better accuracy (optional) ---
+    // Get a token from https://account.mapbox.com/access-tokens
+    // If left empty, the code falls back to OpenStreetMap Nominatim + Overpass
+    const MAPBOX_TOKEN = '';
+
+        // Reverse geocode wrapper: prefer Mapbox (if token present) otherwise Nominatim
+        async function reverseGeocode(lat, lon) {
+            if (MAPBOX_TOKEN && MAPBOX_TOKEN.trim().length > 0) {
+                return reverseGeocodeMapbox(lat, lon);
+            }
+            // Fallback to Nominatim
+            // Request a more detailed result with higher zoom (18)
+            const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&addressdetails=1&extratags=1&namedetails=1&zoom=18`;
+
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!resp.ok) {
+                throw new Error('Reverse geocoding failed with status ' + resp.status);
+            }
+
+            const data = await resp.json();
+
+            // Build a precise address from address components (prefer house number + road etc.)
+            let addressStr = data.display_name || '';
+
+            if (data.address) {
+                const a = data.address;
+                const addrParts = [];
+
+                if (a.house_number && a.road) addrParts.push(`${a.house_number} ${a.road}`);
+                else if (a.road) addrParts.push(a.road);
+
+                if (a.neighbourhood) addrParts.push(a.neighbourhood);
+                if (a.suburb) addrParts.push(a.suburb);
+                if (a.city_district) addrParts.push(a.city_district);
+                if (a.city) addrParts.push(a.city);
+                else if (a.town) addrParts.push(a.town);
+                else if (a.village) addrParts.push(a.village);
+                if (a.county) addrParts.push(a.county);
+                if (a.state) addrParts.push(a.state);
+                if (a.postcode) addrParts.push(a.postcode);
+                if (a.country) addrParts.push(a.country);
+
+                if (addrParts.length) addressStr = addrParts.join(', ');
+            }
+
+            // Derive a nearby landmark if possible
+            let landmark = '';
+
+            // 1) Use explicit 'name' or namedetails
+            if (data.name && !/^[0-9]+ /.test(data.name)) {
+                landmark = data.name;
+            } else if (data.namedetails && data.namedetails.name) {
+                landmark = data.namedetails.name;
+            }
+
+            // 2) Use extratags (amenity, tourism, attraction, shop, office, historic)
+            if (!landmark && data.extratags) {
+                const t = data.extratags;
+                landmark = t.name || t.amenity || t.tourism || t.attraction || t.shop || t.office || t.historic || '';
+            }
+
+            // 3) If still empty, derive from display_name first segment (often POI name)
+            if (!landmark && data.display_name) {
+                const first = data.display_name.split(',')[0].trim();
+                // Heuristic: if the first segment is not purely numeric or generic like a road, use it
+                if (first && !/^\d+$/.test(first) && first.length > 2 && !/road|street|lane|highway|junction/i.test(first)) {
+                    landmark = first;
+                }
+            }
+
+            return {
+                display_name: data.display_name || addressStr,
+                address: addressStr,
+                landmark: landmark || ''
+            };
+        }
+
+        // Mapbox reverse geocode: returns {display_name, address, landmark}
+        async function reverseGeocodeMapbox(lat, lon) {
+            const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(lon)},${encodeURIComponent(lat)}.json`;
+            const params = new URLSearchParams({ access_token: MAPBOX_TOKEN, types: 'address,poi', limit: '5' });
+            const url = `${endpoint}?${params.toString()}`;
+
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('Mapbox reverse geocode failed: ' + resp.status);
+
+            const data = await resp.json();
+            if (!data.features || !data.features.length) return { display_name: '', address: '', landmark: '' };
+
+            // Prefer an 'address' type feature for exact address
+            let addressFeature = data.features.find(f => f.place_type && f.place_type.includes('address')) || data.features[0];
+
+            // Build address string from place_name or context
+            const addressStr = addressFeature.place_name || data.features[0].place_name || '';
+
+            // Find a POI feature for landmark (type poi)
+            const poiFeature = data.features.find(f => f.place_type && f.place_type.includes('poi')) || data.features.find(f => f.properties && f.properties.category);
+
+            let landmark = '';
+            if (poiFeature) landmark = poiFeature.text || poiFeature.place_name || '';
+            else {
+                // fallback: try first segment of place_name if it looks like POI
+                const first = (data.features[0].text || '').trim();
+                if (first && first.length > 2) landmark = first;
+            }
+
+            return {
+                display_name: data.features[0].place_name || addressStr,
+                address: addressStr,
+                landmark: landmark || ''
+            };
+        }
+
+        // Fetch nearby POIs using Mapbox or Overpass depending on config
+        async function fetchNearbyPOIsMapbox(lat, lon, radius = 150) {
+            // Mapbox geocoding for POIs (proximity sorts by closeness)
+            const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/poi.json`;
+            const params = new URLSearchParams({ access_token: MAPBOX_TOKEN, proximity: `${lon},${lat}`, types: 'poi', limit: '10' });
+            const url = `${endpoint}?${params.toString()}`;
+
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('Mapbox POI lookup failed: ' + resp.status);
+
+            const data = await resp.json();
+            if (!data.features || !data.features.length) return [];
+
+            const pois = data.features.map(f => ({
+                id: f.id,
+                name: f.text || f.place_name || (f.properties && f.properties.name) || '',
+                lat: f.center ? f.center[1] : (f.geometry && f.geometry.coordinates ? f.geometry.coordinates[1] : null),
+                lon: f.center ? f.center[0] : (f.geometry && f.geometry.coordinates ? f.geometry.coordinates[0] : null),
+                tags: f.properties || {},
+                type: f.place_type || []
+            })).filter(p => p.name && p.lat && p.lon);
+
+            return pois;
+        }
+
+        async function fetchNearbyPOIsOverpass(lat, lon, radius = 150) {
+            const tags = ['amenity', 'shop', 'tourism', 'historic', 'leisure', 'building', 'office'];
+            const parts = [];
+
+            for (const t of tags) {
+                parts.push(`node(around:${radius},${lat},${lon})[${t}][name];`);
+                parts.push(`way(around:${radius},${lat},${lon})[${t}][name];`);
+                parts.push(`relation(around:${radius},${lat},${lon})[${t}][name];`);
+            }
+
+            const query = `
+[out:json][timeout:25];
+(
+${parts.join('\n')}
+);
+out center 20;
+`;
+
+            const resp = await fetch('https://overpass-api.de/api/interpreter', {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: query
+            });
+
+            if (!resp.ok) throw new Error('Overpass API error: ' + resp.status);
+
+            const data = await resp.json();
+            if (!data.elements) return [];
+
+            const pois = data.elements.map(el => {
+                const name = el.tags && el.tags.name ? el.tags.name : null;
+                let plat = el.lat;
+                let plon = el.lon;
+                if (!plat && el.center) {
+                    plat = el.center.lat;
+                    plon = el.center.lon;
+                }
+                return { id: el.id, name: name, lat: plat, lon: plon, tags: el.tags || {}, type: el.type };
+            }).filter(p => p.name && p.lat && p.lon);
+
+            // Sort by distance
+            function haversine(aLat, aLon, bLat, bLon) {
+                const R = 6371e3;
+                const toRad = v => v * Math.PI / 180;
+                const φ1 = toRad(aLat), φ2 = toRad(bLat);
+                const Δφ = toRad(bLat - aLat), Δλ = toRad(bLon - aLon);
+                const aVal = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+                const c = 2 * Math.atan2(Math.sqrt(aVal), Math.sqrt(1-aVal));
+                return R * c;
+            }
+
+            for (const p of pois) p.distance = haversine(lat, lon, p.lat, p.lon);
+            pois.sort((a,b) => a.distance - b.distance);
+
+            // Dedupe by name
+            const seen = new Set();
+            const uniq = [];
+            for (const p of pois) {
+                const key = p.name.trim();
+                if (!seen.has(key)) { seen.add(key); uniq.push(p); }
+            }
+
+            return uniq.slice(0, 10);
+        }
+
+        // Generic POI fetcher chooses Mapbox if token present else Overpass
+        async function fetchNearbyPOIs(lat, lon, radius = 150) {
+            if (MAPBOX_TOKEN && MAPBOX_TOKEN.trim().length > 0) {
+                return fetchNearbyPOIsMapbox(lat, lon, radius);
+            }
+            return fetchNearbyPOIsOverpass(lat, lon, radius);
+        }
+
+        // Wire up Use My Current Location button
+        useLocationBtn.addEventListener('click', async function () {
+            // UI changes for loading
+            useLocationBtn.disabled = true;
+            const originalText = useLocationBtn.innerHTML;
+            useLocationBtn.innerHTML = '<div class="spinner"></div>Fetching location...';
+            showLocationStatus('Requesting current position...', 'loading');
+
+            try {
+                const pos = await getCurrentPositionPromise({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+
+                latitudeInput.value = lat;
+                longitudeInput.value = lon;
+
+                showLocationStatus('Location acquired. Resolving address...', 'loading');
+
+                // Call reverse geocoding
+                try {
+                    const geo = await reverseGeocode(lat, lon);
+                    if (geo.address) addressInput.value = geo.address;
+                    else if (geo.display_name) addressInput.value = geo.display_name;
+
+                    // Populate landmark suggestions using POI lookup
+                    try {
+                        const pois = await fetchNearbyPOIs(lat, lon, 200);
+                        const list = document.getElementById('landmarkSuggestions');
+                        if (list) list.innerHTML = '';
+
+                        if (pois && pois.length) {
+                            for (const p of pois) {
+                                if (list) {
+                                    const opt = document.createElement('option');
+                                    opt.value = p.name;
+                                    list.appendChild(opt);
+                                }
+                            }
+                        }
+
+                        // Choose best landmark: prefer geo.landmark, else nearest POI
+                        if (geo.landmark) {
+                            landmarkInput.value = geo.landmark;
+                            landmarkInput.placeholder = '';
+                        } else if (pois && pois.length) {
+                            landmarkInput.value = pois[0].name;
+                            landmarkInput.placeholder = '';
+                        } else {
+                            landmarkInput.value = '';
+                            landmarkInput.placeholder = 'No landmark found — please edit or add manually';
+                        }
+
+                    } catch (poisErr) {
+                        console.warn('POI lookup error:', poisErr);
+                        // fallback to geocode-provided landmark
+                        if (geo.landmark) {
+                            landmarkInput.value = geo.landmark;
+                            landmarkInput.placeholder = '';
+                        } else {
+                            landmarkInput.value = '';
+                            landmarkInput.placeholder = 'No landmark found — please edit or add manually';
+                        }
+                    }
+
+                    showLocationStatus('Address fetched successfully.', 'success');
+                } catch (rgErr) {
+                    console.warn('Reverse geocoding error:', rgErr);
+                    // Fill with coordinates-only fallback
+                    addressInput.value = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+                    showLocationStatus('Could not fetch exact address. Showing coordinates.', 'error');
+                }
+
+            } catch (err) {
+                console.error('Geolocation error:', err);
+                let msg = 'Unable to get current position.';
+                if (err.code === 1) msg = 'Permission denied. Please allow location access.';
+                else if (err.code === 2) msg = 'Position unavailable.';
+                else if (err.code === 3) msg = 'Location request timed out.';
+
+                showLocationStatus(msg, 'error');
+            } finally {
+                useLocationBtn.disabled = false;
+                useLocationBtn.innerHTML = originalText;
+            }
+        });
 
         // Photo handling
         photoInput.addEventListener('change', function (e) {
