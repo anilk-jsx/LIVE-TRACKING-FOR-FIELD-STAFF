@@ -5,8 +5,7 @@
 */
 (function () {
     const SESSION_KEY = 'currentUser';
-    // For testing set to 1 minute. Change back to 8 * 60 * 60 * 1000 for production (8 hours)
-    const EXPIRY_MS = 1 * 60 * 1000; // 1 minute (testing)
+    const EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours
 
     function readStored() {
         try {
