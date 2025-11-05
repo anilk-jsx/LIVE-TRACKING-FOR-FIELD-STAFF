@@ -9,7 +9,7 @@
     <!-- Firebase SDKs -->
     <script src="session.js"></script>
     <script>
-        try { if (typeof requireLogin === 'function') requireLogin({ redirectUrl: 'index.html' }); } catch (e) {}
+        try { if (typeof requireLogin === 'function') requireLogin({ redirectUrl: 'index.html' }); } catch (e) { }
     </script>
 
     <script type="module">
@@ -822,8 +822,11 @@
 
                 <div class="form-group">
                     <label for="landmark">Nearby Landmark</label>
-                    <input type="text" id="landmark" name="landmark" list="landmarkSuggestions" placeholder="e.g., Near City Mall, Opposite Bank">
+                    <input type="text" id="landmark" name="landmark" list="landmarkSuggestions"
+                        placeholder="e.g., Near City Mall, Opposite Bank">
                     <datalist id="landmarkSuggestions"></datalist>
+
+                    <!-- (UI kept unchanged) -->
                 </div>
 
                 <div class="form-group">
@@ -1016,7 +1019,7 @@
             }
         });
 
-    // Location helper provided by external module (included at end of file)
+        // Location helper provided by external module (included at end of file)
         // Show location status
         function showLocationStatus(message, type) {
             locationStatus.textContent = message;
@@ -1042,10 +1045,14 @@
             });
         }
 
-    // --- Configuration: set your Mapbox token here for better accuracy (optional) ---
-    // Get a token from https://account.mapbox.com/access-tokens
-    // If left empty, the code falls back to OpenStreetMap Nominatim + Overpass
-    const MAPBOX_TOKEN = '';
+        // --- Configuration: set your Mapbox token here for better accuracy (optional) ---
+        // Get a token from https://account.mapbox.com/access-tokens
+        // If left empty, the code falls back to OpenStreetMap Nominatim + Overpass
+        const MAPBOX_TOKEN = '';
+    // Optional: provide a contact email for polite Nominatim usage (recommended)
+    // Example: const NOMINATIM_EMAIL = 'devteam@example.com';
+    // Leave empty if you don't want to send an email parameter.
+    const NOMINATIM_EMAIL = '';
 
         // Reverse geocode wrapper: prefer Mapbox (if token present) otherwise Nominatim
         async function reverseGeocode(lat, lon) {
@@ -1054,7 +1061,9 @@
             }
             // Fallback to Nominatim
             // Request a more detailed result with higher zoom (18)
-            const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&addressdetails=1&extratags=1&namedetails=1&zoom=18`;
+            // Append email if provided (Nominatim recommends identifying your application)
+            const emailParam = NOMINATIM_EMAIL && NOMINATIM_EMAIL.trim() ? `&email=${encodeURIComponent(NOMINATIM_EMAIL.trim())}` : '';
+            const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&addressdetails=1&extratags=1&namedetails=1&zoom=18${emailParam}`;
 
             const resp = await fetch(url, {
                 method: 'GET',
@@ -1232,13 +1241,13 @@ out center 20;
                 const toRad = v => v * Math.PI / 180;
                 const φ1 = toRad(aLat), φ2 = toRad(bLat);
                 const Δφ = toRad(bLat - aLat), Δλ = toRad(bLon - aLon);
-                const aVal = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
-                const c = 2 * Math.atan2(Math.sqrt(aVal), Math.sqrt(1-aVal));
+                const aVal = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+                const c = 2 * Math.atan2(Math.sqrt(aVal), Math.sqrt(1 - aVal));
                 return R * c;
             }
 
             for (const p of pois) p.distance = haversine(lat, lon, p.lat, p.lon);
-            pois.sort((a,b) => a.distance - b.distance);
+            pois.sort((a, b) => a.distance - b.distance);
 
             // Dedupe by name
             const seen = new Set();
@@ -1259,36 +1268,118 @@ out center 20;
             return fetchNearbyPOIsOverpass(lat, lon, radius);
         }
 
-        // Wire up Use My Current Location button
+        // Compute distance in meters between two coordinates (Haversine)
+        function computeDistanceMeters(lat1, lon1, lat2, lon2) {
+            function toRad(v) { return v * Math.PI / 180; }
+            const R = 6371e3;
+            const φ1 = toRad(lat1), φ2 = toRad(lat2);
+            const Δφ = toRad(lat2 - lat1);
+            const Δλ = toRad(lon2 - lon1);
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // Simple escape for HTML injection in inserted POI names
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // Wire up Use My Current Location button with sampling to improve accuracy (no UI changes)
+        const ACCURACY_THRESHOLD = 30; // meters
+        const MAX_WAIT_MS = 20000; // ms
+        const MAX_SAMPLES = 8;
+
+        function getAccurateLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
+
+                const samples = [];
+                let finished = false;
+                let watchId = null;
+
+                const finish = () => {
+                    if (finished) return;
+                    finished = true;
+                    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+                    if (samples.length === 0) return reject(new Error('No position samples'));
+
+                    // Sort samples by reported accuracy (ascending)
+                    samples.sort((a, b) => (a.coords.accuracy || 1e9) - (b.coords.accuracy || 1e9));
+
+                    // Use a weighted average of top N samples to reduce jitter (weights = 1/accuracy)
+                    const N = Math.min(3, samples.length);
+                    let sumLat = 0, sumLon = 0, sumW = 0;
+                    let sumAcc = 0;
+
+                    for (let i = 0; i < N; i++) {
+                        const c = samples[i].coords;
+                        const acc = c.accuracy || 1e3; // fallback
+                        const w = acc > 0 ? 1 / acc : 1;
+                        sumLat += c.latitude * w;
+                        sumLon += c.longitude * w;
+                        sumW += w;
+                        sumAcc += acc;
+                    }
+
+                    const avgLat = sumLat / sumW;
+                    const avgLon = sumLon / sumW;
+                    const avgAcc = sumAcc / N;
+
+                    console.log('Samples collected:', samples.length, 'using top', N, '-> avgAcc:', avgAcc.toFixed(2));
+
+                    resolve({ latitude: avgLat, longitude: avgLon, accuracy: avgAcc });
+                };
+
+                const errFn = (e) => { if (!finished) { finished = true; if (watchId !== null) navigator.geolocation.clearWatch(watchId); reject(e); } };
+
+                const start = Date.now();
+                watchId = navigator.geolocation.watchPosition((pos) => {
+                    samples.push(pos);
+                    console.log('Position sample:', pos.coords.latitude, pos.coords.longitude, 'acc', pos.coords.accuracy);
+                    if (pos.coords.accuracy && pos.coords.accuracy <= ACCURACY_THRESHOLD) {
+                        finish();
+                        return;
+                    }
+                    if (samples.length >= MAX_SAMPLES) { finish(); return; }
+                    if (Date.now() - start > MAX_WAIT_MS) { finish(); return; }
+                }, errFn, { enableHighAccuracy: true, maximumAge: 0, timeout: MAX_WAIT_MS });
+
+                // safety
+                setTimeout(() => { if (!finished) finish(); }, MAX_WAIT_MS + 500);
+            });
+        }
+
         useLocationBtn.addEventListener('click', async function () {
-            // UI changes for loading
             useLocationBtn.disabled = true;
             const originalText = useLocationBtn.innerHTML;
             useLocationBtn.innerHTML = '<div class="spinner"></div>Fetching location...';
             showLocationStatus('Requesting current position...', 'loading');
 
             try {
-                const pos = await getCurrentPositionPromise({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-                const lat = pos.coords.latitude;
-                const lon = pos.coords.longitude;
+                const best = await getAccurateLocation();
+                const lat = best.latitude;
+                const lon = best.longitude;
+                const acc = best.accuracy;
+
+                console.log('Chosen best position (accuracy m):', acc);
 
                 latitudeInput.value = lat;
                 longitudeInput.value = lon;
 
                 showLocationStatus('Location acquired. Resolving address...', 'loading');
 
-                // Call reverse geocoding
                 try {
                     const geo = await reverseGeocode(lat, lon);
                     if (geo.address) addressInput.value = geo.address;
                     else if (geo.display_name) addressInput.value = geo.display_name;
 
-                    // Populate landmark suggestions using POI lookup
+                    // Populate landmark suggestions (datalist) only
                     try {
                         const pois = await fetchNearbyPOIs(lat, lon, 200);
                         const list = document.getElementById('landmarkSuggestions');
                         if (list) list.innerHTML = '';
-
                         if (pois && pois.length) {
                             for (const p of pois) {
                                 if (list) {
@@ -1299,7 +1390,6 @@ out center 20;
                             }
                         }
 
-                        // Choose best landmark: prefer geo.landmark, else nearest POI
                         if (geo.landmark) {
                             landmarkInput.value = geo.landmark;
                             landmarkInput.placeholder = '';
@@ -1310,10 +1400,8 @@ out center 20;
                             landmarkInput.value = '';
                             landmarkInput.placeholder = 'No landmark found — please edit or add manually';
                         }
-
                     } catch (poisErr) {
                         console.warn('POI lookup error:', poisErr);
-                        // fallback to geocode-provided landmark
                         if (geo.landmark) {
                             landmarkInput.value = geo.landmark;
                             landmarkInput.placeholder = '';
@@ -1326,18 +1414,16 @@ out center 20;
                     showLocationStatus('Address fetched successfully.', 'success');
                 } catch (rgErr) {
                     console.warn('Reverse geocoding error:', rgErr);
-                    // Fill with coordinates-only fallback
                     addressInput.value = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
                     showLocationStatus('Could not fetch exact address. Showing coordinates.', 'error');
                 }
 
             } catch (err) {
-                console.error('Geolocation error:', err);
+                console.error('Geolocation error (sampling):', err);
                 let msg = 'Unable to get current position.';
                 if (err.code === 1) msg = 'Permission denied. Please allow location access.';
                 else if (err.code === 2) msg = 'Position unavailable.';
                 else if (err.code === 3) msg = 'Location request timed out.';
-
                 showLocationStatus(msg, 'error');
             } finally {
                 useLocationBtn.disabled = false;
