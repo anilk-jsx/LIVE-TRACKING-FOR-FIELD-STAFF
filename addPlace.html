@@ -839,52 +839,41 @@
 
             <!-- Photo Section -->
             <div class="photo-section">
-                <h3 style="margin-bottom: 15px; color: #333;">📷 Photos</h3>
-
-                <div class="upload-options">
-                    <div class="upload-option" onclick="document.getElementById('photoInput').click()">
-                        <div class="upload-option-icon">📁</div>
-                        <div class="upload-option-text">
-                            <strong>Upload from Gallery</strong><br>
-                            <small>Select multiple photos</small>
-                        </div>
-                    </div>
-
-                    <div class="upload-option" onclick="openCamera()">
-                        <div class="upload-option-icon">📷</div>
-                        <div class="upload-option-text">
-                            <strong>Take Photo</strong><br>
-                            <small>Use camera to capture</small>
-                        </div>
-                    </div>
-                </div>
-
-                <input type="file" id="photoInput" multiple accept="image/*" style="display: none;">
-                <div id="photoPreview" class="photo-preview"></div>
-            </div>
-
-            <!-- Camera Modal -->
-            <div id="cameraModal" class="camera-modal">
-                <div class="camera-container">
-                    <video id="cameraVideo" class="camera-video" autoplay></video>
-                    <canvas id="photoCanvas" style="display: none;"></canvas>
-                    <div class="camera-controls">
-                        <button class="camera-btn capture-btn" onclick="capturePhoto()">📷 Capture</button>
-                        <button class="camera-btn cancel-btn" onclick="closeCamera()">❌ Cancel</button>
+                <div class="upload-option" onclick="handleTakePhoto()">
+                    <div class="upload-option-icon">📷</div>
+                    <div class="upload-option-text"><strong>Take Photo</strong><br><small>Use camera to capture</small>
                     </div>
                 </div>
             </div>
 
-            <!-- Camera Flash Effect -->
-            <div id="cameraFlash" class="camera-flash"></div>
 
-            <!-- Submit Section -->
-            <div class="submit-section">
-                <button type="submit" id="submitBtn" class="submit-button">
-                    Add Place to Tracking System
-                </button>
+            <input type="file" id="photoInput" multiple accept="image/*" style="display:none">
+            <input type="file" id="cameraCapture" accept="image/*;capture=camera" capture="environment"
+                style="display:none">
+            <div id="photoPreview" class="photo-preview"></div>
+    </div>
+
+
+    <!-- Webcam Modal (for laptops/desktops) -->
+    <div id="cameraModal" class="camera-modal">
+        <div class="camera-container">
+            <video id="cameraVideo" class="camera-video" autoplay></video>
+            <canvas id="photoCanvas" style="display:none"></canvas>
+            <div class="camera-controls">
+                <button type="button" class="camera-btn capture-btn" onclick="capturePhoto()">📸 Capture</button>
+                <button type="button" class="camera-btn cancel-btn" onclick="closeCamera()">❌ Cancel</button>
             </div>
-        </form>
+        </div>
+    </div>
+
+
+    <div id="cameraFlash" class="camera-flash"></div>
+
+
+    <div class="submit-section">
+        <button type="submit" id="submitBtn" class="submit-button">Add Place to Tracking System</button>
+    </div>
+    </form>
     </div>
 
     <!-- Firebase Status Indicator -->
@@ -923,86 +912,78 @@
         const cameraVideo = document.getElementById('cameraVideo');
         const photoCanvas = document.getElementById('photoCanvas');
         const cameraFlash = document.getElementById('cameraFlash');
+        const cameraCapture = document.getElementById('cameraCapture');
 
-        // Camera functionality
-        async function openCamera() {
-            // Check if the browser supports getUserMedia
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert('Camera access is not supported in this browser. Please use the upload option.');
-                return;
-            }
+        function isMobileDevice() {
+            return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        }
 
-            try {
-                cameraStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'environment' // Use back camera on mobile
-                    }
-                });
-                cameraVideo.srcObject = cameraStream;
-                cameraModal.style.display = 'flex';
-            } catch (error) {
-                console.error('Error accessing camera:', error);
-                let errorMessage = 'Unable to access camera. ';
 
-                if (error.name === 'NotAllowedError') {
-                    errorMessage += 'Please allow camera permissions and try again.';
-                } else if (error.name === 'NotFoundError') {
-                    errorMessage += 'No camera found on this device.';
-                } else if (error.name === 'NotSupportedError') {
-                    errorMessage += 'Camera is not supported in this browser.';
-                } else {
-                    errorMessage += 'Please check camera permissions or use the upload option.';
-                }
-
-                alert(errorMessage);
+        function handleTakePhoto() {
+            if (isMobileDevice()) {
+                document.getElementById('cameraCapture').click();
+            } else {
+                openCamera();
             }
         }
 
+
+        async function openCamera() {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                cameraVideo.srcObject = cameraStream;
+                cameraModal.style.display = 'flex';
+            } catch (err) {
+                alert('Camera access denied or not available: ' + err.message);
+            }
+        }
+
+
         function closeCamera() {
             if (cameraStream) {
-                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream.getTracks().forEach(t => t.stop());
                 cameraStream = null;
             }
             cameraModal.style.display = 'none';
         }
 
+
         function capturePhoto() {
-            // Flash effect
             cameraFlash.style.opacity = '0.8';
-            setTimeout(() => {
-                cameraFlash.style.opacity = '0';
-            }, 100);
-
-            const canvas = photoCanvas;
-            const video = cameraVideo;
-
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-
-            const context = canvas.getContext('2d');
-            context.drawImage(video, 0, 0);
-
-            canvas.toBlob(function (blob) {
-                // Create a file object from the blob
-                const timestamp = new Date().getTime();
-                const file = new File([blob], `camera-photo-${timestamp}.jpg`, {
-                    type: 'image/jpeg',
-                    lastModified: timestamp
-                });
-
+            setTimeout(() => cameraFlash.style.opacity = '0', 150);
+            photoCanvas.width = cameraVideo.videoWidth;
+            photoCanvas.height = cameraVideo.videoHeight;
+            const ctx = photoCanvas.getContext('2d');
+            ctx.drawImage(cameraVideo, 0, 0);
+            photoCanvas.toBlob(blob => {
+                const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
                 selectedPhotos.push(file);
-                displayPhoto(file, selectedPhotos.length - 1);
+                displayPhoto(file);
+                closeCamera();
+            }, 'image/jpeg', 0.9);
+        }
 
-                // Show success message briefly
-                const originalText = document.querySelector('.capture-btn').textContent;
-                document.querySelector('.capture-btn').textContent = '✅ Captured!';
 
-                setTimeout(() => {
-                    document.querySelector('.capture-btn').textContent = originalText;
-                    closeCamera();
-                }, 1000);
+        cameraCapture.addEventListener('change', e => {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    selectedPhotos.push(file);
+                    displayPhoto(file);
+                }
+            });
+        });
 
-            }, 'image/jpeg', 0.8);
+
+        function displayPhoto(file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'photo-item';
+                photoPreview.appendChild(img);
+            };
+            reader.readAsDataURL(file);
         }
 
         // Close camera modal when clicking outside
@@ -1049,10 +1030,10 @@
         // Get a token from https://account.mapbox.com/access-tokens
         // If left empty, the code falls back to OpenStreetMap Nominatim + Overpass
         const MAPBOX_TOKEN = '';
-    // Optional: provide a contact email for polite Nominatim usage (recommended)
-    // Example: const NOMINATIM_EMAIL = 'devteam@example.com';
-    // Leave empty if you don't want to send an email parameter.
-    const NOMINATIM_EMAIL = '';
+        // Optional: provide a contact email for polite Nominatim usage (recommended)
+        // Example: const NOMINATIM_EMAIL = 'devteam@example.com';
+        // Leave empty if you don't want to send an email parameter.
+        const NOMINATIM_EMAIL = '';
 
         // Reverse geocode wrapper: prefer Mapbox (if token present) otherwise Nominatim
         async function reverseGeocode(lat, lon) {
