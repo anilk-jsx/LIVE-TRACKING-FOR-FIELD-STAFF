@@ -926,7 +926,39 @@
 
         // Camera functionality
         async function openCamera() {
-            // Check if the browser supports getUserMedia
+            // Heuristic: prefer native file-input capture UI on mobile devices
+            const isMobileUA = /Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+            const smallScreenTouch = ('ontouchstart' in window) && Math.min(window.screen.width, window.screen.height) <= 812;
+            const preferInputCapture = isMobileUA || smallScreenTouch;
+
+            if (preferInputCapture) {
+                // Use an input[type=file] with capture to open the native camera UI on mobile devices.
+                // This avoids extra permission prompts and matches the simple interface you provided.
+                const captureInput = document.createElement('input');
+                captureInput.type = 'file';
+                captureInput.accept = 'image/*';
+                // The capture attribute is honored by many mobile browsers to open the camera directly
+                captureInput.setAttribute('capture', 'environment');
+                captureInput.style.display = 'none';
+
+                captureInput.addEventListener('change', function () {
+                    const file = captureInput.files && captureInput.files[0];
+                    if (file) {
+                        // Add to selected photos and show preview using existing helpers
+                        selectedPhotos.push(file);
+                        displayPhoto(file, selectedPhotos.length - 1);
+                    }
+                    // Cleanup
+                    setTimeout(() => captureInput.remove(), 3000);
+                });
+
+                document.body.appendChild(captureInput);
+                // Programmatically trigger the file picker / camera
+                captureInput.click();
+                return;
+            }
+
+            // Desktop / fallback: use getUserMedia (video modal)
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 alert('Camera access is not supported in this browser. Please use the upload option.');
                 return;
