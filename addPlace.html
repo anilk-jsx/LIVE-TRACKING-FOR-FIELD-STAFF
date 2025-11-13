@@ -1318,20 +1318,24 @@ out center 20;
             return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
 
-        // Wire up Use My Current Location button with sampling to improve accuracy (no UI changes)
-        const ACCURACY_THRESHOLD = 30; // meters
-        const MAX_WAIT_MS = 20000; // ms
-        const MAX_SAMPLES = 8;
+        // Wire up Use My Current Location button with a two-phase strategy:
+        // 1) Quick coarse attempt (fast, low-power) to get an immediate location.
+        // 2) Short high-accuracy refinement using watchPosition to improve precision.
+        // This reduces waiting time for users while still improving final accuracy.
+        const ACCURACY_THRESHOLD = 25; // meters - target accuracy
+        const QUICK_TIMEOUT = 3000; // ms for quick coarse attempt
+        const REFINEMENT_WAIT_MS = 8000; // ms to wait for high-accuracy refinement
+        const MAX_SAMPLES = 6; // max samples to collect during refinement
 
         function getAccurateLocation() {
-            return new Promise((resolve, reject) => {
+            return new Promise(async (resolve, reject) => {
                 if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
 
                 const samples = [];
                 let finished = false;
                 let watchId = null;
 
-                const finish = () => {
+                function finish() {
                     if (finished) return;
                     finished = true;
                     if (watchId !== null) navigator.geolocation.clearWatch(watchId);
@@ -1362,24 +1366,39 @@ out center 20;
                     console.log('Samples collected:', samples.length, 'using top', N, '-> avgAcc:', avgAcc.toFixed(2));
 
                     resolve({ latitude: avgLat, longitude: avgLon, accuracy: avgAcc });
-                };
+                }
 
                 const errFn = (e) => { if (!finished) { finished = true; if (watchId !== null) navigator.geolocation.clearWatch(watchId); reject(e); } };
 
+                // Phase 1: quick coarse attempt (fast, low-power)
+                try {
+                    const quick = await getCurrentPositionPromise({ enableHighAccuracy: false, timeout: QUICK_TIMEOUT, maximumAge: 0 });
+                    console.log('Quick position sample:', quick.coords.latitude, quick.coords.longitude, 'acc', quick.coords.accuracy);
+                    samples.push(quick);
+                    if (quick.coords.accuracy && quick.coords.accuracy <= ACCURACY_THRESHOLD) {
+                        // Good enough, return immediately
+                        return finish();
+                    }
+                } catch (quickErr) {
+                    // Quick attempt failed or timed out - continue to refinement
+                    console.warn('Quick location attempt failed or timed out:', quickErr && quickErr.message ? quickErr.message : quickErr);
+                }
+
+                // Phase 2: refinement with high-accuracy watchPosition (shorter wait)
                 const start = Date.now();
                 watchId = navigator.geolocation.watchPosition((pos) => {
                     samples.push(pos);
-                    console.log('Position sample:', pos.coords.latitude, pos.coords.longitude, 'acc', pos.coords.accuracy);
+                    console.log('Refinement position sample:', pos.coords.latitude, pos.coords.longitude, 'acc', pos.coords.accuracy);
                     if (pos.coords.accuracy && pos.coords.accuracy <= ACCURACY_THRESHOLD) {
                         finish();
                         return;
                     }
                     if (samples.length >= MAX_SAMPLES) { finish(); return; }
-                    if (Date.now() - start > MAX_WAIT_MS) { finish(); return; }
-                }, errFn, { enableHighAccuracy: true, maximumAge: 0, timeout: MAX_WAIT_MS });
+                    if (Date.now() - start > REFINEMENT_WAIT_MS) { finish(); return; }
+                }, errFn, { enableHighAccuracy: true, maximumAge: 0, timeout: REFINEMENT_WAIT_MS });
 
                 // safety
-                setTimeout(() => { if (!finished) finish(); }, MAX_WAIT_MS + 500);
+                setTimeout(() => { if (!finished) finish(); }, REFINEMENT_WAIT_MS + 500);
             });
         }
 
